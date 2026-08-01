@@ -1173,8 +1173,8 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
                               statusStr.includes('EVACUATION') || riskStr.includes('MONITORING');
 
           if (isHazardous) {
-            const rawZLat = zone.lat ?? zone.latitude ?? zone.y_coord;
-            const rawZLng = zone.lng ?? zone.longitude ?? zone.x_coord;
+            const rawZLat = zone.lat ?? zone.latitude;
+            const rawZLng = zone.lng ?? zone.longitude;
             if (rawZLat !== undefined && rawZLng !== undefined && rawZLat !== null && rawZLng !== null) {
               const zLat = parseFloat(rawZLat);
               const zLng = parseFloat(rawZLng);
@@ -1487,10 +1487,18 @@ function LiveMapView() {
     const apiKey = "a770b95390e72d4ac82fab668028f53a";
 
     zones.forEach(async (zone) => {
-      const lat = zone.lat ?? zone.latitude ?? zone.y_coord;
-      const lng = zone.lng ?? zone.longitude ?? zone.x_coord;
+      const rawLat = zone.lat ?? zone.latitude;
+      const rawLng = zone.lng ?? zone.longitude;
 
-      if (lat === undefined || lng === undefined || lat === null || lng === null) return;
+      if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) {
+        console.warn(`⚠️ [Zone Weather Warning] Zone "${zone.name}" (${zone.id}) is missing lat/lng coordinates.`);
+        return;
+      }
+
+      const lat = parseFloat(rawLat);
+      const lng = parseFloat(rawLng);
+
+      if (isNaN(lat) || isNaN(lng)) return;
 
       try {
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`;
@@ -1613,15 +1621,21 @@ function LiveMapView() {
 
             {/* Render Firestore flood_events colored risk zone area overlays */}
             {zones.map((zone) => {
-              const rawLat = zone.lat ?? zone.latitude ?? zone.y_coord;
-              const rawLng = zone.lng ?? zone.longitude ?? zone.x_coord;
+              const rawLat = zone.lat ?? zone.latitude;
+              const rawLng = zone.lng ?? zone.longitude;
               
-              if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) return null;
+              if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) {
+                console.warn(`⚠️ [Zone Render Warning] Skipping zone "${zone.name}" (${zone.id}) — no valid lat/lng coordinates.`);
+                return null;
+              }
 
               const lat = parseFloat(rawLat);
               const lng = parseFloat(rawLng);
 
               if (isNaN(lat) || isNaN(lng)) return null;
+
+              // Log confirmed real-world lat/lng coordinates being used for each zone
+              console.log(`📍 [Zone Coordinates] Zone "${zone.name}" (${zone.id}): lat=${lat}, lng=${lng}`);
 
               const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
               const riskStr = zone.risk || zone.status || 'LOW RISK';
