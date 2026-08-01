@@ -4,7 +4,17 @@ import './App.css';
 
 // Import Firestore & Auth references and functions
 import { db, auth } from './firebase';
-import { collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  serverTimestamp, 
+  query, 
+  orderBy, 
+  limit 
+} from 'firebase/firestore';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -122,6 +132,11 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  // Emergency Alerts active states
+  const [activeAlert, setActiveAlert] = useState(null);
+  const [dismissedAlertId, setDismissedAlertId] = useState(null);
+  const [showBanner, setShowBanner] = useState(false);
+
   // Poll backend health status
   const checkBackendHealth = async () => {
     try {
@@ -154,6 +169,62 @@ function App() {
     };
   }, []);
 
+  // Real-time onSnapshot listener for emergency alerts, ordered by timestamp descending, limit to most recent 1
+  useEffect(() => {
+    const alertsRef = collection(db, 'alerts');
+    const q = query(alertsRef, orderBy('timestamp', 'desc'), limit(1));
+
+    const unsubscribeAlerts = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const alertDoc = snapshot.docs[0];
+        setActiveAlert({ id: alertDoc.id, ...alertDoc.data() });
+      } else {
+        setActiveAlert(null);
+      }
+    }, (error) => {
+      console.error("Firestore emergency alerts listener failed: ", error);
+    });
+
+    return () => unsubscribeAlerts();
+  }, []);
+
+  // Periodically check if the active alert is older than 10 minutes (600,000 ms)
+  useEffect(() => {
+    const evaluateAlertTime = () => {
+      if (!activeAlert) {
+        setShowBanner(false);
+        return;
+      }
+
+      // Hide if the user manually clicked the dismiss (X) button
+      if (dismissedAlertId === activeAlert.id) {
+        setShowBanner(false);
+        return;
+      }
+
+      // If the Firestore server timestamp is still pending local write sync, it is brand new
+      if (!activeAlert.timestamp) {
+        setShowBanner(true);
+        return;
+      }
+
+      const alertTime = activeAlert.timestamp.toDate();
+      const ageMs = Date.now() - alertTime.getTime();
+      const maxAgeMs = 10 * 60 * 1000; // 10 minutes
+
+      if (ageMs < maxAgeMs) {
+        setShowBanner(true);
+      } else {
+        setShowBanner(false);
+      }
+    };
+
+    evaluateAlertTime();
+    const interval = setInterval(evaluateAlertTime, 10000); // Poll alert age every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [activeAlert, dismissedAlertId]);
+
   return (
     <Router>
       {/* Header and Navbar containing useNavigate must be a child of Router */}
@@ -162,6 +233,24 @@ function App() {
         currentUser={currentUser}
         authLoading={authLoading}
       />
+
+      {/* Global Emergency Alert Banner */}
+      {showBanner && activeAlert && (
+        <div className="emergency-banner">
+          <div className="emergency-banner-content">
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span>
+              <strong>EMERGENCY ALERT:</strong> Critical risk detected in <strong>{activeAlert.zone_name}</strong>. {activeAlert.message}
+            </span>
+          </div>
+          <button 
+            className="emergency-banner-btn" 
+            onClick={() => setDismissedAlertId(activeAlert.id)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Routed Pages Area */}
       <Routes>
@@ -933,6 +1022,22 @@ function DashboardView({ backendHealthy }) {
         data.risk, 
         data.confidence
       );
+
+      // If simulated risk is CRITICAL, trigger an emergency alert log in Firestore alerts collection
+      if (data.risk === 'CRITICAL') {
+        try {
+          const alertsRef = collection(db, 'alerts');
+          await addDoc(alertsRef, {
+            zone_name: data.zone_name,
+            message: `Hydrological AI model detects critical river swelling bounds! Rainfall: ${simInputs.rainfall_mm}mm, Water level: ${simInputs.water_level_m}m.`,
+            severity: 'CRITICAL',
+            timestamp: serverTimestamp()
+          });
+          console.log("Emergency alert published to Firestore alerts collection!");
+        } catch (alertErr) {
+          console.error("Failed to write emergency alert: ", alertErr);
+        }
+      }
     } catch (error) {
       console.warn("Prediction API failed. Executing local fallback logic.", error);
       
@@ -966,6 +1071,22 @@ function DashboardView({ backendHealthy }) {
         fallbackData.risk, 
         fallbackData.confidence
       );
+
+      // If standalone fallback yields a CRITICAL risk, log an emergency alert to Firestore alerts collection
+      if (calculatedRisk === 'CRITICAL') {
+        try {
+          const alertsRef = collection(db, 'alerts');
+          await addDoc(alertsRef, {
+            zone_name: fallbackData.zone_name,
+            message: `Hydrological standalone model detects critical river swelling bounds! Rainfall: ${simInputs.rainfall_mm}mm, Water level: ${simInputs.water_level_m}m. (Standalone Fallback)`,
+            severity: 'CRITICAL',
+            timestamp: serverTimestamp()
+          });
+          console.log("Emergency alert published from standalone fallback!");
+        } catch (alertErr) {
+          console.error("Failed to write standalone fallback emergency alert: ", alertErr);
+        }
+      }
     } finally {
       setRunningSim(false);
     }

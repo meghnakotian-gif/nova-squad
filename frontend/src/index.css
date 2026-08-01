@@ -1067,3 +1067,64 @@ body {
   display: inline-block;
 }
 
+/* Emergency Alert Banner */
+.emergency-banner {
+  background: rgba(255, 62, 62, 0.9);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(255, 62, 62, 0.4);
+  box-shadow: 0 4px 20px rgba(255, 62, 62, 0.25);
+  animation: slide-down-fade 0.3s ease-out, banner-pulse 2s infinite alternate;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.emergency-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emergency-banner-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  line-height: 1;
+}
+
+.emergency-banner-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes slide-down-fade {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes banner-pulse {
+  0% {
+    box-shadow: 0 4px 20px rgba(255, 62, 62, 0.25);
+  }
+  100% {
+    box-shadow: 0 4px 25px rgba(255, 62, 62, 0.45);
+  }
+}
+
+
