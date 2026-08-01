@@ -146,10 +146,20 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
                 aria-label="Select Language"
               >
                 <option value="en">🌐 English</option>
-                <option value="kn">🌐 ಕನ್ನಡ (Kannada)</option>
                 <option value="hi">🌐 हिन्दी (Hindi)</option>
-                <option value="tcy">🌐 ತುಳು (Tulu)</option>
+                <option value="kn">🌐 ಕನ್ನಡ (Kannada)</option>
+                <option value="ta">🌐 தமிழ் (Tamil)</option>
+                <option value="te">🌐 తెలుగు (Telugu)</option>
                 <option value="ml">🌐 മലയാളം (Malayalam)</option>
+                <option value="mr">🌐 मराठी (Marathi)</option>
+                <option value="bn">🌐 বাংলা (Bengali)</option>
+                <option value="gu">🌐 ગુજરાતી (Gujarati)</option>
+                <option value="pa">🌐 ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="ur">🌐 اردو (Urdu)</option>
+                <option value="or">🌐 ଓଡ଼ିଆ (Odia)</option>
+                <option value="as">🌐 অসমীয়া (Assamese)</option>
+                <option value="tcy">🌐 ತುಳು (Tulu)</option>
+                <option value="kok">🌐 ಕೊಂಕಣಿ (Konkani)</option>
               </select>
             </li>
 
@@ -3270,16 +3280,16 @@ function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = 
           <section className="panel" style={{ padding: '24px' }}>
             <div className="panel-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h2 className="panel-title">👥 Municipal User Management & Incident Audit</h2>
+                <h2 className="panel-title">{t.userManagementTitle || '👥 Municipal User Management & Incident Audit'}</h2>
                 <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Inspect registered user profiles and audit submitted incident reports in real-time.
+                  {t.userManagementSubtitle || 'Inspect registered user profiles and audit submitted incident reports in real-time.'}
                 </p>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {/* Month Filter Dropdown for Dashboard User Management */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>📅 Month:</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>{t.monthLabel || '📅 Month:'}</span>
                   <select
                     value={dashboardSelectedMonth}
                     onChange={(e) => setDashboardSelectedMonth(e.target.value)}
@@ -3313,7 +3323,7 @@ function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = 
                   color: '#00e676',
                   border: '1px solid rgba(0, 230, 118, 0.3)'
                 }}>
-                  Authority Portal
+                  {t.authorityPortal || 'Authority Portal'}
                 </span>
               </div>
             </div>
@@ -3331,7 +3341,7 @@ function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = 
                 {/* User Selector List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Registered Accounts ({usersList.length})
+                    {t.registeredAccounts || 'Registered Accounts'} ({usersList.length})
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
                     {usersList.map(user => {
@@ -3367,7 +3377,7 @@ function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = 
                                 background: user.role === 'authority' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 255, 255, 0.08)',
                                 color: user.role === 'authority' ? '#00e676' : 'var(--text-muted)'
                               }}>
-                                {user.role === 'authority' ? '🏛️ Authority' : 'Citizen'}
+                                {user.role === 'authority' ? `🏛️ ${t.municipalAuthority || 'Authority'}` : 'Citizen'}
                               </span>
                             </div>
                           </div>
@@ -3405,10 +3415,10 @@ function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
                             <div>
                               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                Incident Sighting Inspector
+                                {t.incidentInspector || 'Incident Sighting Inspector'}
                               </div>
                               <h4 style={{ margin: '2px 0 0', fontSize: '15px', color: 'var(--text-bright)' }}>
-                                Reports by <span style={{ color: 'var(--color-primary)' }}>{selectedUserEmail}</span>
+                                {t.reportsBy || 'Reports by'} <span style={{ color: 'var(--color-primary)' }}>{selectedUserEmail}</span>
                               </h4>
                             </div>
 
@@ -3417,14 +3427,14 @@ function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = 
                               onClick={() => setSelectedUserEmail(null)}
                               style={{ padding: '4px 10px', fontSize: '11px' }}
                             >
-                              Clear Inspector
+                              {t.clearInspector || 'Clear Inspector'}
                             </button>
                           </div>
 
                           {reports.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)', fontSize: '13px' }}>
                               <span style={{ fontSize: '28px', display: 'block', marginBottom: '8px' }}>📑</span>
-                              This user has not submitted any incident sightings yet.
+                              {t.noReportsSubmitted || 'This user has not submitted any incident sightings yet.'}
                             </div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '440px', overflowY: 'auto', paddingRight: '4px' }}>
