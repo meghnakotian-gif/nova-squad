@@ -1148,7 +1148,8 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
         L.latLng(end[0], end[1])
       ],
       routeWhileDragging: false,
-      showAlternatives: false,
+      showAlternatives: true,
+      altLineOptions: { styles: [{ opacity: 0 }] },
       addWaypoints: false,
       fitSelectedRoutes: true,
       show: false,
@@ -1160,19 +1161,20 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
 
     routingControl.on('routesfound', function(e) {
       const routes = e.routes;
-      const summary = routes[0].summary;
-      const coordinates = routes[0].coordinates;
+      if (!routes || routes.length === 0) return;
 
-      let unsafe = false;
-      for (const coord of coordinates) {
-        for (const zone of zones) {
-          const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
-          const riskStr = ((zone.risk || zone.status || '') + '').toUpperCase();
-          const isHazardous = statusStr.includes('CRITICAL') || statusStr.includes('WARNING') || 
-                              riskStr.includes('CRITICAL') || riskStr.includes('WARNING') || 
-                              statusStr.includes('EVACUATION') || riskStr.includes('MONITORING');
+      // Evaluate hazard overlap scores for candidate routes (avoid High Risk, prefer Safe, use Medium Risk only if needed)
+      const evaluated = routes.map((r) => {
+        let highRiskCount = 0;
+        let mediumRiskCount = 0;
+        const coords = r.coordinates || [];
 
-          if (isHazardous) {
+        for (const coord of coords) {
+          for (const zone of zones) {
+            const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
+            const isHighRisk = statusStr.includes('CRITICAL') || statusStr.includes('HIGH');
+            const isMediumRisk = statusStr.includes('WARNING') || statusStr.includes('MEDIUM');
+
             const rawZLat = zone.lat ?? zone.latitude;
             const rawZLng = zone.lng ?? zone.longitude;
             if (rawZLat !== undefined && rawZLng !== undefined && rawZLat !== null && rawZLng !== null) {
@@ -1180,17 +1182,29 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
               const zLng = parseFloat(rawZLng);
               if (!isNaN(zLat) && !isNaN(zLng)) {
                 const dist = map.distance([coord.lat, coord.lng], [zLat, zLng]);
-                const threshold = (parseFloat(zone.radius) || 1500) + 500;
+                const threshold = (parseFloat(zone.radius) || 1500) + 200;
                 if (dist < threshold) {
-                  unsafe = true;
-                  break;
+                  if (isHighRisk) highRiskCount++;
+                  else if (isMediumRisk) mediumRiskCount++;
                 }
               }
             }
           }
         }
-        if (unsafe) break;
-      }
+        return { route: r, highRiskCount, mediumRiskCount };
+      });
+
+      // Sort routes: 1. Minimize High Risk, 2. Minimize Medium Risk, 3. Minimize total distance
+      evaluated.sort((a, b) => {
+        if (a.highRiskCount !== b.highRiskCount) return a.highRiskCount - b.highRiskCount;
+        if (a.mediumRiskCount !== b.mediumRiskCount) return a.mediumRiskCount - b.mediumRiskCount;
+        return a.route.summary.totalDistance - b.route.summary.totalDistance;
+      });
+
+      const selected = evaluated[0];
+      const bestRoute = selected.route;
+      const summary = bestRoute.summary;
+      const coordinates = bestRoute.coordinates;
 
       setRouteCoords(coordinates.map(c => [c.lat, c.lng]));
       
@@ -1198,10 +1212,18 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
       let mins = Math.round((summary.totalTime % 3600) / 60);
       let timeStr = hrs > 0 ? `${hrs} hr ${mins} mins` : `${mins} mins`;
 
+      const hasHighRisk = selected.highRiskCount > 0;
+      const hasMediumRisk = selected.mediumRiskCount > 0;
+
       setRouteInfo({
         distance: (summary.totalDistance / 1000).toFixed(1) + ' km',
         time: timeStr,
-        unsafe: unsafe
+        unsafe: hasHighRisk,
+        warningMsg: hasHighRisk
+          ? '⚠️ WARNING: Route passes through a High Risk flood zone.'
+          : hasMediumRisk
+          ? '⚠️ CAUTION: Rerouted through Medium Risk area (avoiding High Risk flood zones).'
+          : '✅ Safe Route: No active flood hazards along route.'
       });
     });
 
@@ -1337,12 +1359,34 @@ function LiveMapView() {
       }
 
       // 2. Geocode Destination Location with accept-language=en
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en`
-      );
-      const data = await res.json();
+      const destUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en`;
+      console.log(`🌐 [Nominatim Destination Geocode Request URL]:`, destUrl);
+      const res = await fetch(destUrl);
+      let data = await res.json();
+
+      console.log("📦 [Nominatim Destination Geocode Raw Response]:", data);
+
+      // Fallback 1: If query returns 0 results and has no comma (e.g. single-word place like "Kulur"), retry with ", India"
+      if ((!data || data.length === 0) && !destInput.includes(',')) {
+        const fallbackUrl1 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput + ', India')}&format=json&accept-language=en`;
+        console.log(`🌐 [Nominatim Fallback 1 Request URL]:`, fallbackUrl1);
+        const fallbackRes1 = await fetch(fallbackUrl1);
+        data = await fallbackRes1.json();
+        console.log("📦 [Nominatim Fallback 1 Raw Response]:", data);
+      }
+
+      // Fallback 2: Retry with viewbox bias around starting coordinates if still empty
+      if ((!data || data.length === 0) && resolvedStart) {
+        const [sLat, sLng] = resolvedStart;
+        const fallbackUrl2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en&viewbox=${sLng-0.5},${sLat+0.5},${sLng+0.5},${sLat-0.5}`;
+        console.log(`🌐 [Nominatim Fallback 2 Request URL (Viewbox)]`, fallbackUrl2);
+        const fallbackRes2 = await fetch(fallbackUrl2);
+        data = await fallbackRes2.json();
+        console.log("📦 [Nominatim Fallback 2 Raw Response]:", data);
+      }
 
       if (!data || data.length === 0) {
+        console.warn(`⚠️ [Geocoding Failed] Nominatim returned 0 results for query: "${destInput}".`);
         setRouteError("Location not found — please enter a valid address");
         setDestinationCoords(null);
         setRouteInfo(null);
@@ -1367,9 +1411,10 @@ function LiveMapView() {
       const baseLoc = resolvedStart || userLoc;
       if (baseLoc) {
         const distKm = calculateDistanceKm(baseLoc[0], baseLoc[1], destLat, destLng);
+        console.log(`📏 [Distance Check] Geocoded location "${data[0].display_name}" (${destLat}, ${destLng}) is ${distKm.toFixed(2)} km away from start.`);
         if (distKm > 100) {
           console.warn(`Geocoded destination is ${distKm.toFixed(1)}km away (exceeds 100km limit).`);
-          setRouteError("Location not found — please enter a valid address");
+          setRouteError("Location not found — please enter a valid address within 100km");
           setDestinationCoords(null);
           setRouteInfo(null);
           setRouteCoords([]);
@@ -1378,10 +1423,9 @@ function LiveMapView() {
         }
       }
 
-      // Valid destination! Clear errors, draw route & update map center to destination
+      // Valid destination! Clear errors & update destination coordinates (DO NOT recreate flood zones)
       setRouteError('');
       setDestinationCoords([destLat, destLng]);
-      setMapCenter([destLat, destLng]);
     } catch (err) {
       console.error("Route geocoding error: ", err);
       setRouteError("Location not found — please enter a valid address");
@@ -1399,9 +1443,9 @@ function LiveMapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-// Helper to generate an irregular, organic blob polygon (8 vertices) around a center coordinate
-function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed = 1) {
-  const numVertices = 8;
+// Helper to generate a smooth, round 16-vertex organic polygon around a center coordinate
+function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed = 1) {
+  const numVertices = 16; // 16 vertices for smooth, rounded natural curves
   const positions = [];
 
   const pseudoRandom = (idx) => {
@@ -1411,7 +1455,8 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
 
   for (let i = 0; i < numVertices; i++) {
     const angle = (i * 2 * Math.PI) / numVertices;
-    const r = baseRadius * (0.70 + pseudoRandom(i) * 0.60);
+    // Subtler 88% to 112% radial variation creates rounder, smooth, professional neighborhood contours
+    const r = baseRadius * (0.88 + pseudoRandom(i) * 0.24);
     const latOffset = r * Math.cos(angle);
     const lngOffset = (r * Math.sin(angle)) / Math.cos(centerLat * (Math.PI / 180));
     positions.push([centerLat + latOffset, centerLng + lngOffset]);
@@ -1420,22 +1465,23 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
   return positions;
 }
 
-  // Dynamically generate exactly 3 adjacent irregular blob risk zones (Critical, Warning, Normal) around mapCenter & fetch live rainfall from OpenWeatherMap
+  // Dynamically generate & anchor risk zone overlay polygons around the Current Location field (startCoords || userLoc)
   useEffect(() => {
-    if (!mapCenter || mapCenter.length < 2) return;
-    const [cLat, cLng] = mapCenter;
+    const currentStartCenter = startCoords || userLoc;
+    if (!currentStartCenter || currentStartCenter.length < 2) return;
+    const [cLat, cLng] = currentStartCenter;
     setLoading(true);
 
     const apiKey = "a770b95390e72d4ac82fab668028f53a";
 
-    // 3 adjacent sector configurations around mapCenter
+    // 3 well-separated sector configurations firmly anchored around Current Location (startCoords || userLoc)
     const sampleConfigs = [
-      { id: `dyn_nw_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North River Basin', latOff: 0.005, lngOff: -0.005, defaultStatus: 'CRITICAL', defaultRisk: 'CRITICAL EVACUATION', seed: 101 },
-      { id: `dyn_east_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'East Delta District', latOff: 0.004, lngOff: 0.006, defaultStatus: 'WARNING', defaultRisk: 'ELEVATED MONITORING', seed: 202 },
-      { id: `dyn_south_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South Outflow Plain', latOff: -0.006, lngOff: -0.001, defaultStatus: 'NORMAL', defaultRisk: 'LOW RISK', seed: 303 }
+      { id: `curr_nw_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North River Basin', latOff: 0.013, lngOff: -0.012, defaultStatus: 'CRITICAL', defaultRisk: 'High Risk', seed: 101 },
+      { id: `curr_east_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'East Delta District', latOff: 0.010, lngOff: 0.015, defaultStatus: 'WARNING', defaultRisk: 'Medium Risk', seed: 202 },
+      { id: `curr_south_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South Outflow Plain', latOff: -0.014, lngOff: -0.003, defaultStatus: 'NORMAL', defaultRisk: 'Safe', seed: 303 }
     ];
 
-    const fetchDynamicRiskZones = async () => {
+    const fetchCurrentLocationAnchoredZones = async () => {
       try {
         const newZones = await Promise.all(sampleConfigs.map(async (cfg) => {
           const lat = cLat + cfg.latOff;
@@ -1445,6 +1491,25 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
           let desc = "Neighborhood hydrological risk zone.";
           let status = cfg.defaultStatus;
           let risk = cfg.defaultRisk;
+          let zoneName = cfg.name;
+
+          // Reverse geocode lat/lng using Nominatim to fetch real neighborhood/locality name
+          try {
+            const revUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`;
+            console.log(`🌐 [Reverse Geocode Request] Fetching neighborhood for point (${lat.toFixed(4)}, ${lng.toFixed(4)}):`, revUrl);
+            const revRes = await fetch(revUrl);
+            if (revRes.ok) {
+              const revData = await revRes.json();
+              console.log("📦 [Reverse Geocode Raw Response]:", revData);
+              const addr = revData.address || {};
+              const localName = addr.suburb || addr.neighbourhood || addr.residential || addr.quarter || addr.village || addr.town || addr.city_district || addr.county || revData.name || (revData.display_name ? revData.display_name.split(',')[0] : null);
+              if (localName && localName.trim().length > 0) {
+                zoneName = `${localName.trim()} Zone`;
+              }
+            }
+          } catch (revErr) {
+            console.warn(`Reverse geocoding error for point (${lat}, ${lng}):`, revErr);
+          }
 
           try {
             const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`;
@@ -1454,31 +1519,23 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
               rain1h = data.rain?.['1h'] || (data.rain?.['3h'] ? data.rain['3h'] / 3 : 0);
               desc = `${data.weather?.[0]?.description || 'Live weather'}. Temp: ${data.main?.temp || 'N/A'}°C, Humidity: ${data.main?.humidity || 'N/A'}%.`;
 
-              console.log(`🌧️ [3-Zone Weather Point] ${cfg.name} (${lat.toFixed(4)}, ${lng.toFixed(4)}):`, {
-                rainfall_1h_mm: rain1h,
-                weather_main: data.weather?.[0]?.main,
-                full_response: data
-              });
-
-              // Apply live rainfall threshold overrides if thresholds are triggered
               if (rain1h > 20) {
                 status = 'CRITICAL';
-                risk = 'CRITICAL EVACUATION';
+                risk = 'High Risk';
               } else if (rain1h > 10) {
                 status = 'WARNING';
-                risk = 'ELEVATED MONITORING';
+                risk = 'Medium Risk';
               }
             }
           } catch (err) {
-            console.warn(`Weather fetch failed for ${cfg.name}:`, err);
+            console.warn(`Weather fetch failed for ${zoneName}:`, err);
           }
 
-          // Generate organic, non-circular 8-point polygon boundary around center
-          const polygonPoints = generateIrregularBlob(lat, lng, 0.007, cfg.seed);
+          const polygonPoints = generateIrregularBlob(lat, lng, 0.0085, cfg.seed);
 
           return {
             id: cfg.id,
-            name: cfg.name,
+            name: zoneName,
             lat: lat,
             lng: lng,
             latitude: lat,
@@ -1489,7 +1546,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
             rainfall_mm: rain1h,
             desc: desc,
             polygonPoints: polygonPoints,
-            radius: 1200
+            radius: 1400
           };
         }));
 
@@ -1498,14 +1555,14 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
           setSelectedZone(newZones[0]);
         }
       } catch (err) {
-        console.error("Error generating 3-zone dynamic risk map:", err);
+        console.error("Error generating Current Location anchored risk zones:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDynamicRiskZones();
-  }, [mapCenter]);
+    fetchCurrentLocationAnchoredZones();
+  }, [startCoords, userLoc]);
 
   // Helper method to create customized colored Leaflet div markers matching alert severity levels
   const getMarkerIcon = (risk) => {
@@ -1541,12 +1598,12 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
 
         <div className="map-canvas" style={{ flexGrow: 1, minHeight: '380px', position: 'relative', overflow: 'hidden' }}>
           {/* Leaflet React Map Container */}
-          <MapContainer center={mapCenter} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+          <MapContainer center={startCoords || userLoc} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
-            <ChangeMapView center={mapCenter} />
+            <ChangeMapView center={startCoords || userLoc} />
             
             {/* User current location indicator marker */}
             {hasUserLoc && (
@@ -1572,7 +1629,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
               </Marker>
             )}
 
-            {/* Render dynamic 3-zone irregular blob risk area polygons */}
+            {/* Render Google Maps style flood overlay polygons */}
             {zones.map((zone) => {
               const rawLat = zone.lat ?? zone.latitude;
               const rawLng = zone.lng ?? zone.longitude;
@@ -1585,38 +1642,44 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
               if (isNaN(lat) || isNaN(lng)) return null;
 
               const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
-              const riskStr = zone.risk || zone.status || 'LOW RISK';
+              const riskStr = zone.risk || (statusStr.includes('CRITICAL') ? 'High Risk' : statusStr.includes('WARNING') ? 'Medium Risk' : 'Safe');
 
-              const isCritical = statusStr.includes('CRITICAL') || statusStr.includes('EVACUATION');
-              const isWarning = statusStr.includes('WARNING') || statusStr.includes('ELEVATED') || statusStr.includes('MONITORING');
+              const isHigh = statusStr.includes('CRITICAL') || statusStr.includes('HIGH');
+              const isMedium = statusStr.includes('WARNING') || statusStr.includes('MEDIUM');
 
-              const strokeColor = isCritical ? '#dc3545' : isWarning ? '#d97706' : '#059669';
-              const fillColor = isCritical ? '#dc3545' : isWarning ? '#f59e0b' : '#10b981';
+              // Solid, confident risk zone fill colors & clear stroke boundaries
+              const fillColor = isHigh ? '#ef4444' : isMedium ? '#facc15' : '#22c55e';
+              const strokeColor = isHigh ? '#dc2626' : isMedium ? '#d97706' : '#16a34a';
 
               return (
                 <Polygon 
                   key={zone.id} 
-                  positions={zone.polygonPoints || generateIrregularBlob(lat, lng, 0.007, 1)} 
+                  positions={zone.polygonPoints || generateIrregularBlob(lat, lng, 0.0085, 1)} 
                   pathOptions={{
                     color: strokeColor,
                     fillColor: fillColor,
-                    fillOpacity: isCritical ? 0.58 : isWarning ? 0.54 : 0.50,
+                    fillOpacity: 0.52,
                     weight: 2.5
                   }}
                   eventHandlers={{
                     click: () => setSelectedZone(zone)
                   }}
                 >
-                  <Tooltip permanent direction="center" className="risk-zone-floating-label">
-                    <div style={{ textAlign: 'center', lineHeight: '1.2' }}>
-                      <div style={{ fontWeight: '800', fontSize: '12px', color: '#ffffff', whiteSpace: 'nowrap' }}>
-                        {zone.name || 'Risk Zone'}
+                  <Tooltip permanent direction="center" className="zone-map-label">
+                    <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                      <div style={{ fontWeight: '800', fontSize: '12px', color: '#ffffff', whiteSpace: 'nowrap', marginBottom: '3px' }}>
+                        {zone.name || 'Flood Zone'}
                       </div>
                       <div style={{ 
                         fontSize: '10px', 
-                        fontWeight: '700',
-                        marginTop: '3px',
-                        color: isCritical ? '#ff6b6b' : isWarning ? '#fbbf24' : '#34d399'
+                        fontWeight: '800',
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        letterSpacing: '0.3px',
+                        background: isHigh ? 'rgba(239, 68, 68, 0.28)' : isMedium ? 'rgba(250, 204, 21, 0.28)' : 'rgba(34, 197, 94, 0.28)',
+                        border: `1px solid ${isHigh ? '#ef4444' : isMedium ? '#facc15' : '#22c55e'}`,
+                        color: isHigh ? '#fca5a5' : isMedium ? '#fef08a' : '#86efac'
                       }}>
                         {riskStr}
                       </div>
@@ -1632,9 +1695,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
                         Water Level: <strong>{zone.level || 'N/A'}</strong>
                       </div>
                       <div>
-                        Status: <strong style={{ 
-                          color: isCritical ? 'var(--color-danger)' : isWarning ? 'var(--color-warning)' : 'var(--color-success)'
-                        }}>{riskStr}</strong>
+                        Status: <strong style={{ color: strokeColor }}>{riskStr}</strong>
                       </div>
                     </div>
                   </Popup>
@@ -1727,16 +1788,10 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
             )}
 
             {routeInfo && !routeError && (
-              <div style={{ marginTop: '12px', padding: '12px', borderRadius: '4px', background: routeInfo.unsafe ? 'rgba(255, 62, 62, 0.1)' : 'rgba(40, 167, 69, 0.1)', border: `1px solid ${routeInfo.unsafe ? 'var(--color-danger)' : 'var(--color-success)'}` }}>
-                {routeInfo.unsafe ? (
-                  <p style={{ margin: '0 0 8px', color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '13px' }}>
-                    ⚠️ WARNING: This route passes through a risk zone.
-                  </p>
-                ) : (
-                  <p style={{ margin: '0 0 8px', color: 'var(--color-success)', fontWeight: 'bold', fontSize: '13px' }}>
-                    ✅ Safe Route: No active flood hazards detected.
-                  </p>
-                )}
+              <div style={{ marginTop: '12px', padding: '12px', borderRadius: '4px', background: routeInfo.unsafe ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)', border: `1px solid ${routeInfo.unsafe ? '#ef4444' : '#22c55e'}` }}>
+                <p style={{ margin: '0 0 8px', color: routeInfo.unsafe ? '#ef4444' : '#22c55e', fontWeight: 'bold', fontSize: '13px' }}>
+                  {routeInfo.warningMsg || (routeInfo.unsafe ? '⚠️ WARNING: Route passes through a High Risk flood zone.' : '✅ Safe Route: No active flood hazards detected.')}
+                </p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
                   <span>Distance: <strong>{routeInfo.distance}</strong></span>
                   <span>Time: <strong>{routeInfo.time}</strong></span>
