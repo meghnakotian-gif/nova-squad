@@ -71,49 +71,41 @@ def get_telemetry():
 def run_prediction():
     """
     Simulated AI Prediction model endpoint. 
-    Accepts simulation parameters (precipitation, upstream release, soil moisture)
-    and returns a calculated flood probability and risk level.
+    Accepts zone parameters (zone_name, rainfall_mm, water_level_m)
+    and returns a calculated risk level and confidence score.
     """
     req_data = request.get_json() or {}
     
-    # Retrieve inputs with safe defaults
-    precipitation = float(req_data.get('precipitation', 20.0))
-    upstream_release = float(req_data.get('upstream_release', 100.0))
-    soil_moisture = float(req_data.get('soil_moisture', 50.0))
+    zone_name = req_data.get('zone_name', 'Amazon Basin Gauge Sector Alpha')
+    try:
+        rainfall_mm = float(req_data.get('rainfall_mm', 0.0))
+        water_level_m = float(req_data.get('water_level_m', 0.0))
+    except ValueError:
+        return jsonify({"error": "Invalid numerical parameters for rainfall or water level"}), 400
     
-    # Simple algorithmic calculation representing the AI inference logic
-    base_factor = (precipitation * 1.5) + (upstream_release * 0.3) + (soil_moisture * 0.8)
-    # Scale between 0% and 100%
-    probability = min(100.0, max(0.0, round(base_factor / 3.5, 1)))
-    
-    if probability > 80.0:
-        risk_level = "CRITICAL"
-        color = "#ff3e3e"
-    elif probability > 50.0:
-        risk_level = "HIGH"
-        color = "#ffa600"
-    elif probability > 25.0:
-        risk_level = "MODERATE"
-        color = "#e8c800"
+    # Calculate risk level based on simple threshold rules
+    if water_level_m > 5.0:
+        risk = 'CRITICAL'
+    elif water_level_m > 3.0:
+        risk = 'WARNING'
     else:
-        risk_level = "LOW"
-        color = "#00e676"
+        risk = 'NORMAL'
+        
+    # Generate a realistic-looking confidence score between 70% and 95%
+    # Use parameters to anchor seed for stable result patterns
+    seed_val = int(water_level_m * 100) + int(rainfall_mm * 10)
+    random.seed(seed_val)
+    confidence = round(random.uniform(70.0, 95.0), 1)
+    
+    # Reset random seed behavior so other random calls are not fully deterministic
+    random.seed(None)
 
     return jsonify({
-        "success": True,
-        "input_summary": {
-            "precipitation_mm": precipitation,
-            "upstream_release_m3s": upstream_release,
-            "soil_moisture_pct": soil_moisture
-        },
-        "prediction": {
-            "flood_probability_pct": probability,
-            "risk_level": risk_level,
-            "risk_color": color,
-            "estimated_inundation_depth_m": round(max(0.0, (probability - 20) * 0.05), 2),
-            "recommended_action": "Reinforce levees and restrict access" if probability > 50 else "Standard monitoring protocol"
-        }
+        "zone_name": zone_name,
+        "risk": risk,
+        "confidence": confidence
     }), 200
+
 
 # Start server when run directly
 if __name__ == '__main__':
