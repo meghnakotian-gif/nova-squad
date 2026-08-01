@@ -1231,5 +1231,10 @@ body {
   display: none;
 }
 
+/* Hide default leaflet-routing-machine text direction panel */
+.leaflet-routing-container {
+  display: none !important;
+}
+
 
 

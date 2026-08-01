@@ -841,9 +841,14 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
       }
 
       setRouteCoords(coordinates.map(c => [c.lat, c.lng]));
+      
+      let hrs = Math.floor(summary.totalTime / 3600);
+      let mins = Math.round((summary.totalTime % 3600) / 60);
+      let timeStr = hrs > 0 ? `${hrs} hr ${mins} mins` : `${mins} mins`;
+
       setRouteInfo({
         distance: (summary.totalDistance / 1000).toFixed(1) + ' km',
-        time: Math.round(summary.totalTime % 3600 / 60) + ' mins',
+        time: timeStr,
         unsafe: unsafe
       });
     });
@@ -870,15 +875,48 @@ function LiveMapView() {
   const [hasUserLoc, setHasUserLoc] = useState(false);
 
   const [destInput, setDestInput] = useState('');
+  const [startInput, setStartInput] = useState('');
+  const [startCoords, setStartCoords] = useState(null);
   const [destinationCoords, setDestinationCoords] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
   const [routeInfo, setRouteInfo] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
 
+  // Automatically set GPS location when available
+  useEffect(() => {
+    if (hasUserLoc && !startInput) {
+       setStartInput('My Location (GPS)');
+       setStartCoords(userLoc);
+    }
+  }, [hasUserLoc, userLoc]);
+
+  const handleUseMyLocation = () => {
+    if (hasUserLoc) {
+       setStartInput('My Location (GPS)');
+       setStartCoords(userLoc);
+    } else {
+       alert("GPS location not yet available. Please ensure location permissions are granted.");
+    }
+  };
+
   const handleRouteSearch = async () => {
-    if (!destInput) return;
+    if (!destInput || !startInput) return;
     setRouteLoading(true);
     try {
+      let resolvedStart = startCoords;
+      if (startInput !== 'My Location (GPS)') {
+        const startRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json`);
+        const startData = await startRes.json();
+        if (startData && startData.length > 0) {
+           resolvedStart = [parseFloat(startData[0].lat), parseFloat(startData[0].lon)];
+           setStartCoords(resolvedStart);
+        } else {
+           alert("Start location not found.");
+           setRouteLoading(false);
+           return;
+        }
+      }
+
       const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json`);
       const data = await res.json();
       if (data && data.length > 0) {
@@ -888,7 +926,7 @@ function LiveMapView() {
       }
     } catch (err) {
       console.error(err);
-      alert("Error finding destination via geocoding.");
+      alert("Error finding location via geocoding.");
     }
     setRouteLoading(false);
   };
@@ -1089,9 +1127,9 @@ function LiveMapView() {
               );
             })}
 
-            {destinationCoords && (
+            {destinationCoords && startCoords && (
               <SafeRouteMachine 
-                start={userLoc} 
+                start={startCoords} 
                 end={destinationCoords} 
                 zones={zones} 
                 setRouteInfo={setRouteInfo} 
@@ -1130,8 +1168,20 @@ function LiveMapView() {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Current Location</label>
-              <input type="text" value={hasUserLoc ? "My Location (GPS)" : "Default (Bengaluru)"} disabled style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-muted)', color: 'var(--text-muted)', borderRadius: '4px', boxSizing: 'border-box' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Location</label>
+                <button onClick={handleUseMyLocation} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '11px', cursor: 'pointer' }}>Use GPS</button>
+              </div>
+              <input 
+                type="text" 
+                placeholder="Enter start location..." 
+                value={startInput}
+                onChange={(e) => {
+                  setStartInput(e.target.value);
+                  if (e.target.value !== 'My Location (GPS)') setStartCoords(null);
+                }}
+                style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--border-muted)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} 
+              />
             </div>
             
             <div>
@@ -1147,7 +1197,7 @@ function LiveMapView() {
             
             <button 
               onClick={handleRouteSearch}
-              disabled={routeLoading || !destInput}
+              disabled={routeLoading || !destInput || !startInput}
               style={{ width: '100%', padding: '10px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               {routeLoading ? 'Calculating...' : 'Find Safe Route'}
