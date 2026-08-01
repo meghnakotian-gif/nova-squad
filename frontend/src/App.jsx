@@ -1045,7 +1045,8 @@ function HomeView({ t = translations.en }) {
 // REPORT FLOOD VIEW (Sightings Form Layout)
 // ==========================================
 
-function ReportFloodView({ t = translations.en }) {
+function ReportFloodView({ currentUser, t = translations.en }) {
+  const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -1053,13 +1054,43 @@ function ReportFloodView({ t = translations.en }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [allReports, setAllReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     location: "",
     severity: "",
-    email: "",
+    email: currentUser?.email || "",
     details: ""
   });
+
+  useEffect(() => {
+    if (currentUser?.email && !formData.email) {
+      setFormData(prev => ({ ...prev, email: currentUser.email }));
+    }
+  }, [currentUser]);
+
+  // Real-time listener for ALL reports from ALL users ordered by timestamp desc
+  useEffect(() => {
+    const reportsQuery = query(
+      collection(db, 'citizen_reports'),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
+      const reportsData = snapshot.docs.map(docItem => ({
+        id: docItem.id,
+        ...docItem.data()
+      }));
+      setAllReports(reportsData);
+      setReportsLoading(false);
+    }, (err) => {
+      console.warn("Error fetching all citizen reports:", err);
+      setReportsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -1069,43 +1100,43 @@ function ReportFloodView({ t = translations.en }) {
     }));
   };
 
-// Helper function to upload image file to ImgBB API with progress tracking
-const uploadToImgBB = (file, onProgress) => {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const bodyData = new FormData();
-    bodyData.append('image', file);
+  // Helper function to upload image file to ImgBB API with progress tracking
+  const uploadToImgBB = (file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const bodyData = new FormData();
+      bodyData.append('image', file);
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        onProgress(percent);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const res = JSON.parse(xhr.responseText);
-          if (res.success && res.data && res.data.url) {
-            resolve(res.data.url);
-          } else {
-            reject(new Error(res.error?.message || "ImgBB upload failed"));
-          }
-        } catch (err) {
-          reject(err);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
         }
-      } else {
-        reject(new Error(`ImgBB upload failed with status ${xhr.status}`));
-      }
-    };
+      };
 
-    xhr.onerror = () => reject(new Error("Network error during ImgBB image upload"));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const res = JSON.parse(xhr.responseText);
+            if (res.success && res.data && res.data.url) {
+              resolve(res.data.url);
+            } else {
+              reject(new Error(res.error?.message || "ImgBB upload failed"));
+            }
+          } catch (err) {
+            reject(err);
+          }
+        } else {
+          reject(new Error(`ImgBB upload failed with status ${xhr.status}`));
+        }
+      };
 
-    xhr.open('POST', 'https://api.imgbb.com/1/upload?key=c414c205b1db6c4b434019236c6041f9');
-    xhr.send(bodyData);
-  });
-};
+      xhr.onerror = () => reject(new Error("Network error during ImgBB image upload"));
+
+      xhr.open('POST', 'https://api.imgbb.com/1/upload?key=c414c205b1db6c4b434019236c6041f9');
+      xhr.send(bodyData);
+    });
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -1123,7 +1154,6 @@ const uploadToImgBB = (file, onProgress) => {
 
     let photoUrl = null;
 
-    // Attempt photo upload to ImgBB if a file is selected
     if (selectedFile) {
       setUploadingPhoto(true);
       try {
@@ -1140,26 +1170,25 @@ const uploadToImgBB = (file, onProgress) => {
     }
 
     try {
-      // Save report details with photoUrl (or null) to Firestore
       const reportsRef = collection(db, 'citizen_reports');
       await addDoc(reportsRef, {
         location: formData.location,
         severity: formData.severity,
-        email: formData.email,
+        email: currentUser?.email || formData.email || 'Anonymous',
         details: formData.details,
         photoUrl: photoUrl || null,
         timestamp: serverTimestamp()
       });
 
-      // Reset form and file state
       setFormData({
         location: "",
         severity: "",
-        email: "",
+        email: currentUser?.email || "",
         details: ""
       });
       setSelectedFile(null);
       setSubmitted(true);
+      setShowForm(false);
     } catch (err) {
       console.error("Firestore error logging incident: ", err);
       setError("Unable to submit report. Please verify connection and try again.");
@@ -1170,150 +1199,268 @@ const uploadToImgBB = (file, onProgress) => {
 
   return (
     <div className="report-layout panel pulsing-glow">
-      <div className="form-header">
-        <h2>{t.reportLocalIncident || 'Report Local Incident'}</h2>
-        <p>{t.reportSubtitle || 'Help refine our hydrological forecasts by submitting live sightings of flooding or high water conditions.'}</p>
-        {error && (
-          <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
-            ⚠️ {error}
-          </div>
-        )}
+      {/* Top Header Row with Page Title & Small '+' Button */}
+      <div className="form-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px' }}>
+        <div>
+          <h2 style={{ margin: '0 0 6px' }}>{t.reportLocalIncident || 'Report Incident & Sightings Feed'}</h2>
+          <p style={{ margin: 0 }}>{t.reportSubtitle || 'Live community feed of flood sightings and hydrological reports from all users.'}</p>
+        </div>
+
+        <button 
+          className="btn btn-primary"
+          onClick={() => {
+            setShowForm(!showForm);
+            setSubmitted(false);
+          }}
+          title={showForm ? 'Close Report Form' : 'Submit New Report'}
+          style={{
+            borderRadius: '12px',
+            padding: '10px 16px',
+            fontSize: '13px',
+            fontWeight: '700',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          {showForm ? '✕ Close' : '➕ New Report'}
+        </button>
       </div>
 
-      {submitted ? (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>✅</span>
-          <h3 style={{ color: 'var(--text-bright)' }}>{t.reportLogged || 'Report Logged'}</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
-            {t.reportThankYou || 'Thank you. Your sighting details have been queued for processing.'}
-          </p>
-          <button className="btn btn-secondary" onClick={() => setSubmitted(false)}>
-            {t.submitAnotherReport || 'Submit Another Report'}
-          </button>
+      {error && (
+        <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginBottom: '16px', fontWeight: '600' }}>
+          ⚠️ {error}
         </div>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="location">{t.incidentLocation || 'Incident Location / Area'}</label>
-            <input 
-              type="text" 
-              id="location" 
-              className="form-input" 
-              placeholder={t.locationPlaceholder || 'e.g. Rio Negro Bridge Crossing (KM 12)'}
-              value={formData.location}
-              onChange={handleChange}
-              required 
-              disabled={submitting}
-            />
-          </div>
+      )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="severity">{t.visualSeverity || 'Visual Water Level Severity'}</label>
-            <select 
-              id="severity" 
-              className="form-select" 
-              value={formData.severity}
-              onChange={handleChange}
-              required
-              disabled={submitting}
-            >
-              <option value="">{t.chooseSeverity || 'Choose Severity Option...'}</option>
-              <option value="normal">{t.normalBaseline || 'Normal Baseline (Safe)'}</option>
-              <option value="elevated">{t.elevatedSeverity || 'Elevated (Flooded Banks)'}</option>
-              <option value="severe">{t.severeSeverity || 'Severe (Inundation of Fields/Roadways)'}</option>
-              <option value="critical">{t.criticalSeverity || 'Critical (Levee Overtopping/Evacuating)'}</option>
-            </select>
-          </div>
+      {/* Submission Confirmation Banner when submitted */}
+      {submitted && !showForm && (
+        <div style={{ background: 'rgba(0, 230, 118, 0.12)', border: '1px solid rgba(0, 230, 118, 0.3)', borderRadius: '12px', padding: '16px', marginBottom: '24px', textAlign: 'center' }}>
+          <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>✅</span>
+          <h4 style={{ color: '#00e676', margin: '0 0 4px' }}>{t.reportLogged || 'Report Successfully Published!'}</h4>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+            Your sighting has been logged to the live community feed below.
+          </p>
+        </div>
+      )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">{t.reporterEmail || 'Reporter Contact Email'}</label>
-            <input 
-              type="email" 
-              id="email" 
-              className="form-input" 
-              placeholder="name@agency.gov" 
-              value={formData.email}
-              onChange={handleChange}
-              required 
-              disabled={submitting}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="details">{t.observationsLabel || 'Observations & Details'}</label>
-            <textarea 
-              id="details" 
-              className="form-textarea" 
-              placeholder={t.observationsPlaceholder || 'Provide a brief description of river state, blockages, or structures affected...'}
-              value={formData.details}
-              onChange={handleChange}
-              disabled={submitting}
-            ></textarea>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="photo">{t.sightingDoc || 'Sighting Documentation (Photos / Video)'}</label>
-            <div className="upload-zone" style={{ opacity: submitting ? 0.6 : 1, position: 'relative', cursor: 'pointer' }}>
+      {/* Collapsible Form (Shown when '+' button is clicked) */}
+      {showForm && (
+        <div style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-muted)', borderRadius: '14px', padding: '24px', marginBottom: '32px' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text-bright)', fontSize: '18px' }}>
+            📝 {t.submitIncidentSighting || 'Submit Incident Sighting'}
+          </h3>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="location">{t.incidentLocation || 'Incident Location / Area'}</label>
               <input 
-                type="file" 
-                id="photo" 
-                accept="image/*" 
-                onChange={handleFileChange}
+                type="text" 
+                id="location" 
+                className="form-input" 
+                placeholder={t.locationPlaceholder || 'e.g. Kulur River Bridge, Mangaluru'}
+                value={formData.location}
+                onChange={handleChange}
+                required 
                 disabled={submitting}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  opacity: 0,
-                  cursor: submitting ? 'not-allowed' : 'pointer'
-                }}
               />
-              <span className="upload-icon">📸</span>
-              {selectedFile ? (
-                <div style={{ textAlign: 'center' }}>
-                  <span className="upload-text" style={{ color: 'var(--text-bright)', fontWeight: 'bold' }}>
-                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                  </span>
-                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-primary)', marginTop: '4px' }}>
-                    Click to change selected photo
-                  </span>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="severity">{t.visualSeverity || 'Visual Water Level Severity'}</label>
+              <select 
+                id="severity" 
+                className="form-select" 
+                value={formData.severity}
+                onChange={handleChange}
+                required
+                disabled={submitting}
+              >
+                <option value="">{t.chooseSeverity || 'Choose Severity Option...'}</option>
+                <option value="normal">{t.normalBaseline || 'Normal Baseline (Safe)'}</option>
+                <option value="elevated">{t.elevatedSeverity || 'Elevated (Flooded Banks)'}</option>
+                <option value="severe">{t.severeSeverity || 'Severe (Inundation of Fields/Roadways)'}</option>
+                <option value="critical">{t.criticalSeverity || 'Critical (Levee Overtopping/Evacuating)'}</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="email">{t.reporterEmail || 'Reporter Contact Email'}</label>
+              <input 
+                type="email" 
+                id="email" 
+                className="form-input" 
+                placeholder="name@agency.gov" 
+                value={formData.email}
+                onChange={handleChange}
+                required 
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="details">{t.observationsLabel || 'Observations & Details'}</label>
+              <textarea 
+                id="details" 
+                className="form-textarea" 
+                placeholder={t.observationsPlaceholder || 'Provide a brief description of river state, blockages, or structures affected...'}
+                value={formData.details}
+                onChange={handleChange}
+                disabled={submitting}
+              ></textarea>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="photo">{t.sightingDoc || 'Sighting Documentation (Photos / Video)'}</label>
+              <div className="upload-zone" style={{ opacity: submitting ? 0.6 : 1, position: 'relative', cursor: 'pointer' }}>
+                <input 
+                  type="file" 
+                  id="photo" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  disabled={submitting}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: submitting ? 'not-allowed' : 'pointer'
+                  }}
+                />
+                <span className="upload-icon">📸</span>
+                {selectedFile ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <span className="upload-text" style={{ color: 'var(--text-bright)', fontWeight: 'bold' }}>
+                      Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </span>
+                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-primary)', marginTop: '4px' }}>
+                      Click to change selected photo
+                    </span>
+                  </div>
+                ) : (
+                  <span className="upload-text">{t.clickOrDragUpload || 'Click or drag media files here to attach photo to incident log'}</span>
+                )}
+              </div>
+
+              {uploadingPhoto && (
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <span>Uploading photo to Storage...</span>
+                    <span><strong>{uploadProgress}%</strong></span>
+                  </div>
+                  <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'var(--color-primary)', transition: 'width 0.2s ease' }}></div>
+                  </div>
                 </div>
-              ) : (
-                <span className="upload-text">{t.clickOrDragUpload || 'Click or drag media files here to attach photo to incident log'}</span>
+              )}
+
+              {uploadError && (
+                <div style={{ color: 'var(--color-warning)', fontSize: '12px', marginTop: '6px', fontWeight: '600' }}>
+                  ⚠️ {uploadError}
+                </div>
               )}
             </div>
 
-            {uploadingPhoto && (
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  <span>Uploading photo to Storage...</span>
-                  <span><strong>{uploadProgress}%</strong></span>
-                </div>
-                <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'var(--color-primary)', transition: 'width 0.2s ease' }}></div>
-                </div>
-              </div>
-            )}
-
-            {uploadError && (
-              <div style={{ color: 'var(--color-warning)', fontSize: '12px', marginTop: '6px', fontWeight: '600' }}>
-                ⚠️ {uploadError}
-              </div>
-            )}
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: '100%' }}
-            disabled={submitting}
-          >
-            {submitting ? (uploadingPhoto ? `Uploading Photo (${uploadProgress}%)...` : 'Saving Report...') : 'Submit Incident Sighting'}
-          </button>
-        </form>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ width: '100%' }}
+              disabled={submitting}
+            >
+              {submitting ? (uploadingPhoto ? `Uploading Photo (${uploadProgress}%)...` : 'Saving Report...') : 'Submit Incident Sighting'}
+            </button>
+          </form>
+        </div>
       )}
+
+      {/* Full List of ALL Reports from ALL Users */}
+      <section style={{ marginTop: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-bright)' }}>
+            📋 {t.allIncidentReports || 'Community Incident Feed'} ({allReports.length})
+          </h3>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            {reportsLoading ? 'Syncing reports...' : 'Real-time updates'}
+          </span>
+        </div>
+
+        {reportsLoading ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+            Loading community report feed...
+          </div>
+        ) : allReports.length === 0 ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+            No incident reports submitted yet. Click <strong>➕ New Report</strong> above to be the first!
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {allReports.map((report) => {
+              const sevUpper = (report.severity || '').toUpperCase();
+              return (
+                <div 
+                  key={report.id}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--border-muted)',
+                    borderRadius: '16px',
+                    padding: '18px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}
+                >
+                  {/* Report Card Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="user-email-badge" style={{ fontSize: '12px' }}>
+                        👤 {report.email || 'Anonymous Citizen'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className={`alert-indicator ${sevUpper}`} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px' }}>
+                        {report.severity || 'ELEVATED'}
+                      </span>
+                      <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                        🕒 {getTimeAgo(report.timestamp)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Location & Details */}
+                  <div>
+                    <h4 style={{ margin: '0 0 6px', fontSize: '15px', color: 'var(--text-bright)' }}>
+                      📍 {report.location || 'Incident Area'}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--text-main)', lineHeight: '1.5' }}>
+                      {report.details || 'No additional details provided.'}
+                    </p>
+                  </div>
+
+                  {/* Photo Attachment if Present */}
+                  {report.photoUrl && (
+                    <div style={{ marginTop: '6px' }}>
+                      <img 
+                        src={report.photoUrl} 
+                        alt="Incident Sighting Document" 
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '260px',
+                          objectFit: 'cover',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -2153,9 +2300,14 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
 // ANALYTICS & SIMULATOR DASHBOARD VIEW
 // ==========================================
 
-function DashboardView({ backendHealthy, t = translations.en }) {
+function DashboardView({ backendHealthy, userRole, t = translations.en }) {
   // Theme switcher state (Dark Space default, Light Mode, Ocean Blue)
   const [dashboardTheme, setDashboardTheme] = useState(() => localStorage.getItem('dashboardTheme') || 'dark');
+
+  // Real-time user management state for authority users
+  const [usersList, setUsersList] = useState([]);
+  const [selectedUserEmail, setSelectedUserEmail] = useState(null);
+  const [userMgmtLoading, setUserMgmtLoading] = useState(true);
 
   // Current telemetry readings from the river basin sensors
   const [telemetry, setTelemetry] = useState({
@@ -2191,6 +2343,74 @@ function DashboardView({ backendHealthy, t = translations.en }) {
   const [hasPredicted, setHasPredicted] = useState(false);
   // Track Firestore save state
   const [firestoreSaved, setFirestoreSaved] = useState(false);
+
+  // Real-time listener for user management & reports (Authority Role Only)
+  useEffect(() => {
+    if (userRole !== 'authority') return;
+
+    let usersMap = new Map();
+    let reportsData = [];
+
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      snapshot.docs.forEach(d => {
+        const u = d.data();
+        if (u.email) {
+          usersMap.set(u.email.toLowerCase(), {
+            uid: d.id,
+            email: u.email,
+            role: u.role || getRoleForEmail(u.email),
+            createdAt: u.createdAt
+          });
+        }
+      });
+      combineUsersAndReports();
+    }, (err) => console.warn("Firestore users listener warn:", err));
+
+    const unsubReports = onSnapshot(collection(db, 'citizen_reports'), (snapshot) => {
+      reportsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      reportsData.forEach(r => {
+        if (r.email) {
+          const clean = r.email.trim().toLowerCase();
+          if (!usersMap.has(clean)) {
+            usersMap.set(clean, {
+              uid: `legacy_${clean}`,
+              email: r.email,
+              role: getRoleForEmail(r.email),
+              createdAt: r.timestamp
+            });
+          }
+        }
+      });
+
+      combineUsersAndReports();
+    }, (err) => console.warn("Firestore reports listener warn:", err));
+
+    const combineUsersAndReports = () => {
+      const combined = Array.from(usersMap.values()).map(u => {
+        const uReports = reportsData.filter(r => (r.email || '').toLowerCase() === u.email.toLowerCase());
+        uReports.sort((a, b) => {
+          const tA = a.timestamp?.seconds || 0;
+          const tB = b.timestamp?.seconds || 0;
+          return tB - tA;
+        });
+        return {
+          ...u,
+          reportCount: uReports.length,
+          reports: uReports
+        };
+      });
+
+      combined.sort((a, b) => b.reportCount - a.reportCount || a.email.localeCompare(b.email));
+      setUsersList(combined);
+      setUserMgmtLoading(false);
+    };
+
+    return () => {
+      unsubUsers();
+      unsubReports();
+    };
+  }, [userRole]);
 
   // OpenWeatherMap Live Weather states
   const [liveWeather, setLiveWeather] = useState({
@@ -2678,6 +2898,170 @@ function DashboardView({ backendHealthy, t = translations.en }) {
           </div>
         )}
       </section>
+
+      {/* User Management Panel (Authority Role Only) */}
+      {userRole === 'authority' && (
+        <section className="panel" style={{ marginTop: '24px', gridColumn: '1 / -1' }}>
+          <div className="panel-header" style={{ marginBottom: '12px' }}>
+            <h2 className="panel-title">👥 User Management & Sighting Audit</h2>
+            <span className="user-email-badge" style={{ fontSize: '11px' }}>
+              Authority Portal
+            </span>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+            List of registered users and submitted report counts. Click a user to view their submitted incident reports inline.
+          </p>
+
+          {userMgmtLoading ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px', textAlign: 'center' }}>
+              Loading registered users and reports...
+            </div>
+          ) : usersList.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px', textAlign: 'center' }}>
+              No users found.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {usersList.map(user => {
+                const isSelected = selectedUserEmail === user.email;
+                return (
+                  <div 
+                    key={user.email} 
+                    style={{ 
+                      background: 'rgba(255, 255, 255, 0.02)', 
+                      border: isSelected ? '1px solid var(--color-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '14px',
+                      overflow: 'hidden',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {/* User Row Header */}
+                    <div 
+                      onClick={() => setSelectedUserEmail(isSelected ? null : user.email)}
+                      style={{
+                        padding: '14px 18px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        background: isSelected ? 'rgba(0, 176, 255, 0.06)' : 'transparent'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '18px' }}>👤</span>
+                        <div>
+                          <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-bright)' }}>
+                            {user.email}
+                          </div>
+                          <span style={{ 
+                            fontSize: '10px', 
+                            fontWeight: '700', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px', 
+                            textTransform: 'uppercase',
+                            background: user.role === 'authority' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                            color: user.role === 'authority' ? '#00e676' : 'var(--text-muted)'
+                          }}>
+                            {user.role === 'authority' ? '🏛️ Authority' : 'Citizen'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          background: user.reportCount > 0 ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          color: user.reportCount > 0 ? 'var(--color-primary)' : 'var(--text-muted)',
+                          border: `1px solid ${user.reportCount > 0 ? 'rgba(0, 176, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`
+                        }}>
+                          📋 {user.reportCount} {user.reportCount === 1 ? 'Report' : 'Reports'}
+                        </span>
+                        <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                          {isSelected ? '▲' : '▼'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Inline Expanded User Detail View */}
+                    {isSelected && (
+                      <div style={{ padding: '16px 18px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0, 0, 0, 0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                          <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-bright)' }}>
+                            Reports Submitted by <span style={{ color: 'var(--color-primary)' }}>{user.email}</span>
+                          </h4>
+                          <button 
+                            className="btn btn-secondary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedUserEmail(null);
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px' }}
+                          >
+                            Close Details
+                          </button>
+                        </div>
+
+                        {user.reports.length === 0 ? (
+                          <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '12px 0' }}>
+                            This user has not submitted any incident reports yet.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                            {user.reports.map((rep, rIdx) => {
+                              const sevUpper = (rep.severity || '').toUpperCase();
+                              return (
+                                <div 
+                                  key={rep.id || rIdx} 
+                                  style={{
+                                    background: 'rgba(20, 24, 33, 0.8)',
+                                    border: '1px solid var(--border-muted)',
+                                    borderRadius: '12px',
+                                    padding: '14px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-bright)' }}>
+                                      📍 {rep.location || 'Unknown Location'}
+                                    </span>
+                                    <span className={`alert-indicator ${sevUpper}`} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px' }}>
+                                      {rep.severity || 'ELEVATED'}
+                                    </span>
+                                  </div>
+                                  <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                                    {rep.details || 'No additional details provided.'}
+                                  </p>
+                                  {rep.photoUrl && (
+                                    <div style={{ marginTop: '4px' }}>
+                                      <img 
+                                        src={rep.photoUrl} 
+                                        alt="User Incident Sighting" 
+                                        style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} 
+                                      />
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    🕒 {getTimeAgo(rep.timestamp)}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
     </main>
     </div>
   );
