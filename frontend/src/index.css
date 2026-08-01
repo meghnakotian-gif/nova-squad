@@ -1127,4 +1127,109 @@ body {
   }
 }
 
+/* Style Leaflet Popups to match dark space theme */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: rgba(16, 20, 28, 0.95) !important;
+  backdrop-filter: blur(12px);
+  color: var(--text-bright) !important;
+  border: 1px solid var(--border-muted) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-close-button {
+  color: var(--text-muted) !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: var(--text-bright) !important;
+}
+
+/* Mobile responsiveness adjustments */
+@media (max-width: 767px) {
+  /* Hide desktop top nav links */
+  .app-header .navbar {
+    display: none;
+  }
+
+  /* Make mobile bottom nav visible */
+  .mobile-navbar {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(10, 12, 16, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-muted);
+    justify-content: space-around;
+    align-items: center;
+    z-index: 9999;
+    padding: 0 4px;
+    box-sizing: border-box;
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 10px;
+    gap: 3px;
+    flex: 1;
+    height: 100%;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-nav-item.active {
+    color: var(--color-primary);
+    text-shadow: 0 0 8px var(--color-primary-glow);
+  }
+
+  .mobile-nav-icon {
+    font-size: 18px;
+  }
+
+  /* App container adjustments for bottom nav */
+  #root {
+    padding-bottom: 72px; /* Prevent bottom content being cut off by the navigation bar */
+  }
+
+  /* Stack panels vertically across components */
+  .map-view-grid, .dashboard-grid, .info-grid, .report-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Adjust Map Interactive Canvas width/height in mobile view */
+  .map-canvas {
+    height: 360px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Hide background grid layers and custom absolute SVG vector paths on OSM map */
+  .map-grid-layer, .map-river-vector, .map-zone-overlay {
+    display: none !important;
+  }
+
+  /* Compact hero banner spacing on mobile devices */
+  .home-hero {
+    padding: 20px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .home-title {
+    font-size: 28px !important;
+  }
+}
+
+/* Hide mobile navbar on desktop */
+.mobile-navbar {
+  display: none;
+}
+
+
 

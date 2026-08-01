@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
 import './App.css';
 
+// Import Leaflet & React-Leaflet packages for interactive mapping
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
 // Import Firestore & Auth references and functions
 import { db, auth } from './firebase';
 import { 
@@ -268,6 +273,39 @@ function App() {
           Flood Pulse AI • Hydrographic Forecasting and Pulse Analysis Platform • Powered by Flask & React Vite
         </p>
       </footer>
+
+      {/* Mobile Bottom Navigation Bar */}
+      {!authLoading && (
+        <nav className="mobile-navbar">
+          <NavLink to="/" end className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+            <span className="mobile-nav-icon">🏠</span>
+            <span>Home</span>
+          </NavLink>
+          <NavLink to="/live-map" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+            <span className="mobile-nav-icon">🗺️</span>
+            <span>Live Map</span>
+          </NavLink>
+          <NavLink to="/report" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+            <span className="mobile-nav-icon">📝</span>
+            <span>Report</span>
+          </NavLink>
+          <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+            <span className="mobile-nav-icon">📊</span>
+            <span>Dashboard</span>
+          </NavLink>
+          {currentUser ? (
+            <Link to="/login" onClick={() => signOut(auth)} className="mobile-nav-item">
+              <span className="mobile-nav-icon">🔓</span>
+              <span>Logout</span>
+            </Link>
+          ) : (
+            <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+              <span className="mobile-nav-icon">👤</span>
+              <span>Login</span>
+            </NavLink>
+          )}
+        </nav>
+      )}
     </Router>
   );
 }
@@ -709,21 +747,48 @@ function ReportFloodView() {
 // LIVE MAP VIEW (Vector Hazard Overlays & Firestore)
 // ==========================================
 
+// Helper component to center the map when userLoc coordinates resolve
+function ChangeMapView({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+}
+
 function LiveMapView() {
-  // State variables for firestore indicators
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState(null);
 
+  // User location coordinate tracker (defaults to Bengaluru, India coordinates)
+  const [userLoc, setUserLoc] = useState([12.9716, 77.5946]);
+  const [hasUserLoc, setHasUserLoc] = useState(false);
+
+  // Request browser geolocation on mount
   useEffect(() => {
-    // Reference the 'flood_events' collection in Firestore
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLoc([position.coords.latitude, position.coords.longitude]);
+          setHasUserLoc(true);
+        },
+        (error) => {
+          console.warn("User geolocation permission denied or failed. Displaying default coordinates.", error);
+        },
+        { timeout: 5000 }
+      );
+    }
+  }, []);
+
+  useEffect(() => {
     const colRef = collection(db, 'flood_events');
 
-    // Establish real-time onSnapshot listener for instant updates
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
-      // If collection is empty, auto-seed the default markers
       if (snapshot.empty) {
-        console.log("No documents found in flood_events. Auto-seeding default markers to Firestore...");
+        console.log("No documents found in flood_events. Auto-seeding Leaflet map hotspots to Firestore...");
         
         const seedData = [
           {
@@ -733,8 +798,8 @@ function LiveMapView() {
             status: 'NORMAL',
             risk: 'LOW RISK',
             desc: 'No overtopping detected. Standard river discharge levels.',
-            x_coord: 25,
-            y_coord: 25,
+            latitude: 12.9916,
+            longitude: 77.5646,
             marker_class: 'healthy-marker'
           },
           {
@@ -744,8 +809,8 @@ function LiveMapView() {
             status: 'CRITICAL',
             risk: 'CRITICAL EVACUATION',
             desc: 'Water levels exceeding critical flood limits. Evacuating agricultural fields.',
-            x_coord: 55,
-            y_coord: 45,
+            latitude: 12.9516,
+            longitude: 77.6146,
             marker_class: 'critical-marker'
           },
           {
@@ -755,8 +820,8 @@ function LiveMapView() {
             status: 'WARNING',
             risk: 'ELEVATED MONITORING',
             desc: 'Active runoff and elevated water level. Watching river pulse velocity closely.',
-            x_coord: 75,
-            y_coord: 25,
+            latitude: 13.0016,
+            longitude: 77.6046,
             marker_class: 'warning-marker'
           }
         ];
@@ -769,7 +834,7 @@ function LiveMapView() {
             console.error("Auto-seeding error writing doc: ", err);
           }
         });
-        return; // setDoc operations will trigger onSnapshot again with seedData
+        return;
       }
 
       const zonesData = [];
@@ -794,50 +859,115 @@ function LiveMapView() {
       setLoading(false);
     });
 
-    // Cleanup real-time stream subscription on component unmount
     return () => unsubscribe();
   }, []);
+
+  // Helper method to create customized colored Leaflet div markers matching alert severity levels
+  const getMarkerIcon = (risk) => {
+    const status = (risk || '').toUpperCase();
+    const color = status.includes('CRITICAL') ? 'var(--color-danger)' : status.includes('WARNING') ? 'var(--color-warning)' : 'var(--color-success)';
+    const shadowColor = status.includes('CRITICAL') ? 'var(--color-danger-glow)' : status.includes('WARNING') ? 'rgba(255, 193, 7, 0.4)' : 'rgba(40, 167, 69, 0.4)';
+    
+    return L.divIcon({
+      className: 'custom-leaflet-marker',
+      html: `<div style="
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: ${color};
+        box-shadow: 0 0 10px ${shadowColor};
+        border: 2px solid #fff;
+      "></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+  };
 
   return (
     <div className="map-view-grid">
       {/* Map Interactive Canvas */}
-      <section className="panel map-card">
+      <section className="panel map-card" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="map-view-header">
-          <h2 className="panel-title" style={{ margin: 0 }}>🗺️ Live Risk Map</h2>
+          <h2 className="panel-title" style={{ margin: 0 }}>🗺️ Live Leaflet Risk Map</h2>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             {loading ? 'Connecting Firestore...' : '🟢 Connected Live'}
           </span>
         </div>
 
-        <div className="map-canvas">
-          {/* Grid Background */}
-          <div className="map-grid-layer"></div>
+        <div className="map-canvas" style={{ flexGrow: 1, minHeight: '380px', position: 'relative', overflow: 'hidden' }}>
+          {/* Leaflet React Map Container */}
+          <MapContainer center={userLoc} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            />
+            
+            {/* User current location indicator marker */}
+            {hasUserLoc && (
+              <Marker 
+                position={userLoc} 
+                icon={L.divIcon({
+                  className: 'user-loc-marker',
+                  html: `<div style="
+                    width: 14px;
+                    height: 14px;
+                    border-radius: 50%;
+                    background-color: #00b0ff;
+                    box-shadow: 0 0 10px rgba(0, 176, 255, 0.8);
+                    border: 2px solid #fff;
+                  "></div>`,
+                  iconSize: [14, 14],
+                  iconAnchor: [7, 7]
+                })}
+              >
+                <Popup>
+                  <div style={{ color: '#fff', fontSize: '12px' }}>📍 Your Coordinates</div>
+                </Popup>
+              </Marker>
+            )}
 
-          {/* Blur overlays for flood zones */}
-          <div className="map-zone-overlay zone-critical"></div>
-          <div className="map-zone-overlay zone-warning"></div>
-          <div className="map-zone-overlay zone-safe"></div>
+            {/* Render Firestore flood_events markers */}
+            {zones.map((zone) => {
+              const lat = zone.latitude;
+              const lng = zone.longitude;
+              if (lat === undefined || lng === undefined) return null;
 
-          {/* SVG river channels path */}
-          <svg className="map-river-vector">
-            <path d="M 50 10 Q 150 180, 220 220 T 380 480" className="map-river-line" />
-            <path d="M 220 220 Q 300 120, 420 80" className="map-river-line" style={{ strokeWidth: '3px' }} />
-          </svg>
+              const statusStr = zone.status || 'NORMAL';
+              const riskStr = zone.risk || 'LOW RISK';
 
-          {/* Hotspot Markers streamed from Firestore */}
-          {zones.map((zone) => (
-            <div 
-              key={zone.id}
-              className={`map-marker ${zone.marker_class || 'healthy-marker'}`} 
-              style={{ left: `${zone.x_coord}%`, top: `${zone.y_coord}%` }}
-              onClick={() => setSelectedZone(zone)}
-            >
-              <div className="marker-inner"></div>
-            </div>
-          ))}
+              return (
+                <Marker 
+                  key={zone.id} 
+                  position={[lat, lng]} 
+                  icon={getMarkerIcon(statusStr)}
+                  eventHandlers={{
+                    click: () => setSelectedZone(zone)
+                  }}
+                >
+                  <Popup>
+                    <div style={{ fontSize: '12.5px', padding: '2px' }}>
+                      <h4 style={{ margin: '0 0 6px', fontWeight: '700', borderBottom: '1px solid #333', paddingBottom: '4px' }}>
+                        {zone.name}
+                      </h4>
+                      <div style={{ marginBottom: '4px' }}>
+                        Water Level: <strong>{zone.level}</strong>
+                      </div>
+                      <div>
+                        Status: <strong style={{ 
+                          color: statusStr === 'CRITICAL' ? 'var(--color-danger)' : statusStr === 'WARNING' ? 'var(--color-warning)' : 'var(--color-success)'
+                        }}>{riskStr}</strong>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+
+            <ChangeMapView center={userLoc} />
+          </MapContainer>
 
           {/* Canvas Legend overlay */}
-          <div className="map-canvas-legend">
+          <div className="map-canvas-legend" style={{ zIndex: 1000 }}>
             <span><span className="legend-dot" style={{ background: 'var(--color-success)' }}></span> Normal</span>
             <span><span className="legend-dot" style={{ background: 'var(--color-warning)' }}></span> Warning</span>
             <span><span className="legend-dot" style={{ background: 'var(--color-danger)' }}></span> Critical</span>
