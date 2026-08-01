@@ -1431,6 +1431,17 @@ body {
   display: none !important;
 }
 
+/* Risk Zone SVG Polygon styling & drop shadow */
+.risk-zone-polygon {
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  transition: filter 0.3s ease, fill-opacity 0.3s ease;
+  cursor: pointer;
+}
+
+.risk-zone-polygon:hover {
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.75));
+}
+
 /* Custom Tooltip Label for Leaflet Risk Zone Area Overlays */
 .zone-map-label, .risk-zone-floating-label {
   background: rgba(15, 23, 42, 0.92) !important;

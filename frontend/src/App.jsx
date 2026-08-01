@@ -1624,20 +1624,35 @@ function LiveMapView({ t = translations.en }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-// Helper to generate a smooth, round 16-vertex organic polygon around a center coordinate
-function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed = 1) {
-  const numVertices = 16; // 16 vertices for smooth, rounded natural curves
-  const positions = [];
-
+// Helper to generate a smooth, round organic polygon with 14 control points and cosine-interpolated 28 rounded vertices
+function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed = 1) {
+  const numControlPoints = 14;
   const pseudoRandom = (idx) => {
     const sinVal = Math.sin(seed * 78.233 + idx * 12.9898) * 43758.5453;
     return sinVal - Math.floor(sinVal);
   };
 
+  // Generate control radii with subtle 90% to 110% variation
+  const radii = [];
+  for (let i = 0; i < numControlPoints; i++) {
+    radii.push(baseRadius * (0.90 + pseudoRandom(i) * 0.20));
+  }
+
+  // Cosine smooth interpolation across 28 vertices for natural rounded contours
+  const numVertices = 28;
+  const positions = [];
+
   for (let i = 0; i < numVertices; i++) {
+    const frac = (i / numVertices) * numControlPoints;
+    const idx1 = Math.floor(frac) % numControlPoints;
+    const idx2 = (idx1 + 1) % numControlPoints;
+    const t = frac - Math.floor(frac);
+    
+    // Smooth cosine interpolation
+    const smoothT = (1 - Math.cos(t * Math.PI)) / 2;
+    const r = radii[idx1] * (1 - smoothT) + radii[idx2] * smoothT;
+
     const angle = (i * 2 * Math.PI) / numVertices;
-    // Subtler 88% to 112% radial variation creates rounder, smooth, professional neighborhood contours
-    const r = baseRadius * (0.88 + pseudoRandom(i) * 0.24);
     const latOffset = r * Math.cos(angle);
     const lngOffset = (r * Math.sin(angle)) / Math.cos(centerLat * (Math.PI / 180));
     positions.push([centerLat + latOffset, centerLng + lngOffset]);
@@ -1657,9 +1672,9 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
 
     // 3 well-separated sector configurations firmly anchored around Current Location (startCoords || userLoc)
     const sampleConfigs = [
-      { id: `curr_nw_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North River Basin', latOff: 0.013, lngOff: -0.012, defaultStatus: 'CRITICAL', defaultRisk: 'High Risk', seed: 101 },
-      { id: `curr_east_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'East Delta District', latOff: 0.010, lngOff: 0.015, defaultStatus: 'WARNING', defaultRisk: 'Medium Risk', seed: 202 },
-      { id: `curr_south_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South Outflow Plain', latOff: -0.014, lngOff: -0.003, defaultStatus: 'NORMAL', defaultRisk: 'Safe', seed: 303 }
+      { id: `curr_nw_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North River Basin', latOff: 0.014, lngOff: -0.014, defaultStatus: 'CRITICAL', defaultRisk: 'High Risk', seed: 101 },
+      { id: `curr_east_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'East Delta District', latOff: 0.011, lngOff: 0.016, defaultStatus: 'WARNING', defaultRisk: 'Medium Risk', seed: 202 },
+      { id: `curr_south_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South Outflow Plain', latOff: -0.015, lngOff: -0.004, defaultStatus: 'NORMAL', defaultRisk: 'Safe', seed: 303 }
     ];
 
     const fetchCurrentLocationAnchoredZones = async () => {
@@ -1712,7 +1727,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
             console.warn(`Weather fetch failed for ${zoneName}:`, err);
           }
 
-          const polygonPoints = generateIrregularBlob(lat, lng, 0.0085, cfg.seed);
+          const polygonPoints = generateIrregularBlob(lat, lng, 0.0075, cfg.seed);
 
           return {
             id: cfg.id,
@@ -1857,12 +1872,13 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
               return (
                 <Polygon 
                   key={zone.id} 
-                  positions={zone.polygonPoints || generateIrregularBlob(lat, lng, 0.0085, 1)} 
+                  positions={zone.polygonPoints || generateIrregularBlob(lat, lng, 0.0075, 1)} 
                   pathOptions={{
                     color: strokeColor,
                     fillColor: fillColor,
-                    fillOpacity: 0.52,
-                    weight: 2.5
+                    fillOpacity: 0.65,
+                    weight: 3,
+                    className: 'risk-zone-polygon'
                   }}
                   eventHandlers={{
                     click: () => setSelectedZone(zone)
