@@ -64,7 +64,9 @@ function getTimeAgo(timestamp, timeRaw) {
 function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead, lang, setLang, t }) {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const mobileDropdownRef = useRef(null);
 
   const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
 
@@ -84,6 +86,9 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
+      if (mobileDropdownRef.current && !mobileDropdownRef.current.contains(e.target)) {
+        setMobileDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -92,9 +97,104 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
   return (
     <header className="app-header">
       <div className="brand-section">
-        <h1>
-          🌊 {t.brand || "NOVA Flood Squad"} <span className="brand-badge">Engine v1.0</span>
-        </h1>
+        <div className="brand-title-row">
+          <h1>
+            🌊 {t.brand || "NOVA Flood Squad"} <span className="brand-badge">Engine v1.0</span>
+          </h1>
+
+          {/* Mobile Top Header Actions (Language Selector & Notification Bell) */}
+          <div className="mobile-header-actions">
+            <select 
+              value={lang} 
+              onChange={(e) => {
+                const selected = e.target.value;
+                setLang(selected);
+                localStorage.setItem('appLanguage', selected);
+              }}
+              className="language-selector-dropdown mobile-lang-select"
+              title="Select Language"
+              aria-label="Select Language"
+            >
+              <option value="en">🌐 English</option>
+              <option value="kn">🌐 ಕನ್ನಡ</option>
+              <option value="hi">🌐 हिन्दी</option>
+              <option value="tcy">🌐 ತುಳು</option>
+              <option value="ml">🌐 മലയാളം</option>
+            </select>
+
+            {!authLoading && currentUser && (
+              <div style={{ position: 'relative' }} ref={mobileDropdownRef}>
+                <button 
+                  className="notification-bell-btn mobile-bell-btn"
+                  onClick={() => setMobileDropdownOpen(!mobileDropdownOpen)}
+                  title="Notifications"
+                  aria-label="Notifications"
+                >
+                  🔔
+                  {unreadCount > 0 && (
+                    <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                  )}
+                </button>
+
+                {mobileDropdownOpen && (
+                  <div className="notification-dropdown mobile-notification-dropdown">
+                    <div className="notification-header">
+                      <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-bright)' }}>
+                        Notifications {unreadCount > 0 && <span style={{ opacity: 0.7 }}>({unreadCount} unread)</span>}
+                      </div>
+                      {unreadCount > 0 && (
+                        <button 
+                          className="mark-all-btn"
+                          onClick={onMarkAllRead}
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="notification-list">
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                          No notifications yet
+                        </div>
+                      ) : (
+                        notifications.map(item => {
+                          const isUnread = !readIds.has(item.id);
+                          const isReport = item.type === 'New Report';
+                          return (
+                            <div 
+                              key={item.id} 
+                              className={`notification-item ${isUnread ? 'unread' : ''}`}
+                              onClick={() => {
+                                onMarkRead(item.id);
+                                setMobileDropdownOpen(false);
+                              }}
+                            >
+                              <div className="notification-item-header">
+                                <span className={`notification-tag ${isReport ? 'report-tag' : 'alert-tag'}`}>
+                                  {isReport ? '📝 New Report' : '🚨 Alert'}
+                                </span>
+                                <span className="notification-time">
+                                  {getTimeAgo(item.timestamp, item.timeRaw)}
+                                </span>
+                              </div>
+                              <div className="notification-location">
+                                📍 {item.location}
+                              </div>
+                              <div className="notification-details">
+                                {item.severity ? `Severity: ${item.severity.toUpperCase()}` : ''} {item.details ? `— ${item.details}` : ''}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="header-actions">
