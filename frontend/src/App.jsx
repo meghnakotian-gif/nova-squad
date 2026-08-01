@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate, Nav
 import './App.css';
 
 // Import Leaflet & React-Leaflet packages for interactive mapping
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine';
 
 // Import Firestore & Auth references and functions
 import { db, auth } from './firebase';
@@ -790,6 +791,75 @@ function ChangeMapView({ center }) {
   return null;
 }
 
+function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!start || !end) {
+      setRouteCoords([]);
+      setRouteInfo(null);
+      return;
+    }
+
+    const routingControl = L.Routing.control({
+      waypoints: [
+        L.latLng(start[0], start[1]),
+        L.latLng(end[0], end[1])
+      ],
+      routeWhileDragging: false,
+      showAlternatives: false,
+      addWaypoints: false,
+      fitSelectedRoutes: true,
+      show: false,
+      createMarker: function() { return null; }, // Hide default markers
+      lineOptions: {
+        styles: [{ opacity: 0 }] // Hide default line, we render Polyline manually
+      }
+    }).addTo(map);
+
+    routingControl.on('routesfound', function(e) {
+      const routes = e.routes;
+      const summary = routes[0].summary;
+      const coordinates = routes[0].coordinates;
+
+      let unsafe = false;
+      for (const coord of coordinates) {
+        for (const zone of zones) {
+          if (zone.status === 'CRITICAL' || zone.status === 'WARNING') {
+            const zLat = zone.latitude;
+            const zLng = zone.longitude;
+            if (zLat !== undefined && zLng !== undefined) {
+              const dist = map.distance([coord.lat, coord.lng], [zLat, zLng]);
+              if (dist < 2500) { // 2.5km warning threshold
+                unsafe = true;
+                break;
+              }
+            }
+          }
+        }
+        if (unsafe) break;
+      }
+
+      setRouteCoords(coordinates.map(c => [c.lat, c.lng]));
+      setRouteInfo({
+        distance: (summary.totalDistance / 1000).toFixed(1) + ' km',
+        time: Math.round(summary.totalTime % 3600 / 60) + ' mins',
+        unsafe: unsafe
+      });
+    });
+
+    return () => {
+      try {
+        map.removeControl(routingControl);
+      } catch (err) {
+        console.error("Cleanup routing error:", err);
+      }
+    };
+  }, [map, start, end, zones, setRouteCoords, setRouteInfo]);
+
+  return null;
+}
+
 function LiveMapView() {
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -798,6 +868,30 @@ function LiveMapView() {
   // User location coordinate tracker (defaults to Bengaluru, India coordinates)
   const [userLoc, setUserLoc] = useState([12.9716, 77.5946]);
   const [hasUserLoc, setHasUserLoc] = useState(false);
+
+  const [destInput, setDestInput] = useState('');
+  const [destinationCoords, setDestinationCoords] = useState(null);
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  const handleRouteSearch = async () => {
+    if (!destInput) return;
+    setRouteLoading(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        setDestinationCoords([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+      } else {
+        alert("Destination not found. Please try a different address.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error finding destination via geocoding.");
+    }
+    setRouteLoading(false);
+  };
 
   // Request browser geolocation on mount
   useEffect(() => {
@@ -995,6 +1089,26 @@ function LiveMapView() {
               );
             })}
 
+            {destinationCoords && (
+              <SafeRouteMachine 
+                start={userLoc} 
+                end={destinationCoords} 
+                zones={zones} 
+                setRouteInfo={setRouteInfo} 
+                setRouteCoords={setRouteCoords} 
+              />
+            )}
+            
+            {routeCoords.length > 0 && (
+              <Polyline 
+                positions={routeCoords} 
+                color={routeInfo?.unsafe ? '#ff3e3e' : '#00b0ff'} 
+                weight={6} 
+                opacity={0.8}
+                dashArray={routeInfo?.unsafe ? "10, 10" : ""}
+              />
+            )}
+
             <ChangeMapView center={userLoc} />
           </MapContainer>
 
@@ -1009,7 +1123,57 @@ function LiveMapView() {
 
       {/* Selected Hotspot Panel */}
       <section className="map-details-container">
-        <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        
+        {/* Route Search Panel */}
+        <div className="panel" style={{ marginBottom: '16px' }}>
+          <h3 className="panel-title" style={{ marginBottom: '16px' }}>🗺️ Safe Route Finder</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Current Location</label>
+              <input type="text" value={hasUserLoc ? "My Location (GPS)" : "Default (Bengaluru)"} disabled style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-muted)', color: 'var(--text-muted)', borderRadius: '4px', boxSizing: 'border-box' }} />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Destination</label>
+              <input 
+                type="text" 
+                placeholder="Enter destination address..." 
+                value={destInput}
+                onChange={(e) => setDestInput(e.target.value)}
+                style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--border-muted)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} 
+              />
+            </div>
+            
+            <button 
+              onClick={handleRouteSearch}
+              disabled={routeLoading || !destInput}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              {routeLoading ? 'Calculating...' : 'Find Safe Route'}
+            </button>
+            
+            {routeInfo && (
+              <div style={{ marginTop: '12px', padding: '12px', borderRadius: '4px', background: routeInfo.unsafe ? 'rgba(255, 62, 62, 0.1)' : 'rgba(40, 167, 69, 0.1)', border: `1px solid ${routeInfo.unsafe ? 'var(--color-danger)' : 'var(--color-success)'}` }}>
+                {routeInfo.unsafe ? (
+                  <p style={{ margin: '0 0 8px', color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '13px' }}>
+                    ⚠️ WARNING: This route passes through a risk zone.
+                  </p>
+                ) : (
+                  <p style={{ margin: '0 0 8px', color: 'var(--color-success)', fontWeight: 'bold', fontSize: '13px' }}>
+                    ✅ Safe Route: No active flood hazards detected.
+                  </p>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <span>Distance: <strong>{routeInfo.distance}</strong></span>
+                  <span>Time: <strong>{routeInfo.time}</strong></span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="panel" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <h3 className="panel-title" style={{ marginBottom: '16px' }}>📍 Zone Information</h3>
           
           {selectedZone ? (
