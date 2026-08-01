@@ -254,13 +254,11 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
                       {t.reportFlood || 'Report Incident'}
                     </NavLink>
                   </li>
-                  {userRole === 'authority' && (
-                    <li className="nav-item">
-                      <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        {t.dashboard || 'Dashboard'}
-                      </NavLink>
-                    </li>
-                  )}
+                  <li className="nav-item">
+                    <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                      {t.dashboard || 'Dashboard'}
+                    </NavLink>
+                  </li>
 
                   {/* Bell Icon with Unread Count Badge & Dropdown */}
                   <li className="nav-item" style={{ position: 'relative' }} ref={dropdownRef}>
@@ -697,8 +695,8 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole} requiredRole="authority">
-            <DashboardView backendHealthy={backendHealthy} t={t} />
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
+            <DashboardView backendHealthy={backendHealthy} userRole={userRole} t={t} />
           </ProtectedRoute>
         } />
         <Route path="/login" element={<LoginView t={t} />} />
@@ -729,12 +727,10 @@ function App() {
                 <span className="mobile-nav-icon">📝</span>
                 <span>{t.reportFlood || 'Report'}</span>
               </NavLink>
-              {userRole === 'authority' && (
-                <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                  <span className="mobile-nav-icon">📊</span>
-                  <span>{t.dashboard || 'Dashboard'}</span>
-                </NavLink>
-              )}
+              <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                <span className="mobile-nav-icon">📊</span>
+                <span>{t.dashboard || 'Dashboard'}</span>
+              </NavLink>
               <Link to="/" onClick={() => signOut(auth)} className="mobile-nav-item">
                 <span className="mobile-nav-icon">🔓</span>
                 <span>{t.logout || 'Logout'}</span>
@@ -2304,6 +2300,9 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
   // Theme switcher state (Dark Space default, Light Mode, Ocean Blue)
   const [dashboardTheme, setDashboardTheme] = useState(() => localStorage.getItem('dashboardTheme') || 'dark');
 
+  // Dashboard active tab state ('telemetry' | 'simulator' | 'user-management')
+  const [activeTab, setActiveTab] = useState('telemetry');
+
   // Real-time user management state for authority users
   const [usersList, setUsersList] = useState([]);
   const [selectedUserEmail, setSelectedUserEmail] = useState(null);
@@ -2658,411 +2657,555 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
 
   return (
     <div className={`dashboard-container dashboard-theme-${dashboardTheme}`} style={{ transition: 'all 0.3s ease' }}>
-      {/* Theme Switcher Header Controls */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <span style={{ fontSize: '12.5px', fontWeight: 'bold', opacity: 0.85 }}>{t.dashboardThemeLabel || '🎨 Dashboard Theme:'}</span>
-        <select 
-          value={dashboardTheme} 
-          onChange={(e) => {
-            const selected = e.target.value;
-            setDashboardTheme(selected);
-            localStorage.setItem('dashboardTheme', selected);
-          }}
-          className="theme-switcher-dropdown"
-          title="Select Dashboard Theme"
-          aria-label="Select Dashboard Theme"
-        >
-          <option value="dark">{t.themeDark || '🌙 Dark Space (Default)'}</option>
-          <option value="light">{t.themeLight || '☀️ Light Mode'}</option>
-          <option value="ocean">{t.themeOcean || '🌊 Ocean Blue'}</option>
-        </select>
+      {/* Top Header Controls Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px', fontSize: '22px', color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            📊 {t.analyticsDashboard || 'Analytics & Simulator Dashboard'}
+            {userRole === 'authority' && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: '700',
+                background: 'linear-gradient(135deg, rgba(0, 176, 255, 0.2), rgba(0, 230, 118, 0.2))',
+                color: '#00e676',
+                padding: '3px 10px',
+                borderRadius: '12px',
+                border: '1px solid rgba(0, 230, 118, 0.4)',
+                letterSpacing: '0.3px'
+              }}>
+                🏛️ Municipal Authority Mode
+              </span>
+            )}
+          </h2>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+            Real-time basin hydrology telemetry, AI predictive risk modeling, and authority operations feed.
+          </p>
+        </div>
+
+        {/* Theme Switcher Header Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12.5px', fontWeight: 'bold', opacity: 0.85 }}>{t.dashboardThemeLabel || '🎨 Theme:'}</span>
+          <select 
+            value={dashboardTheme} 
+            onChange={(e) => {
+              const selected = e.target.value;
+              setDashboardTheme(selected);
+              localStorage.setItem('dashboardTheme', selected);
+            }}
+            className="theme-switcher-dropdown"
+            title="Select Dashboard Theme"
+            aria-label="Select Dashboard Theme"
+          >
+            <option value="dark">{t.themeDark || '🌙 Dark Space'}</option>
+            <option value="light">{t.themeLight || '☀️ Light Mode'}</option>
+            <option value="ocean">{t.themeOcean || '🌊 Ocean Blue'}</option>
+          </select>
+        </div>
       </div>
 
-      <main className="dashboard-grid">
-        {/* Left Side: Sensor Telemetry Widget */}
-        <section className="panel pulsing-glow">
-          <div className="panel-header">
-            <h2 className="panel-title">{t.realTimeHydrology || '📡 Real-Time Hydrology Telemetry'}</h2>
-            <button 
-              className="btn btn-secondary" 
-              onClick={fetchTelemetry}
-              disabled={loadingTelemetry}
-            >
-              {loadingTelemetry ? (t.refreshingSensors || 'Refreshing Sensors...') : (t.pollSensors || '🔄 Poll Sensors')}
-            </button>
-          </div>
+      {/* SECTION TABS BAR */}
+      <div className="dashboard-tabs-bar" style={{
+        display: 'flex',
+        gap: '12px',
+        marginBottom: '24px',
+        borderBottom: '1px solid var(--border-muted)',
+        paddingBottom: '14px',
+        overflowX: 'auto'
+      }}>
+        <button
+          className={`dashboard-tab-btn ${activeTab === 'telemetry' ? 'active' : ''}`}
+          onClick={() => setActiveTab('telemetry')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            fontSize: '13.5px',
+            fontWeight: '700',
+            border: activeTab === 'telemetry' ? '1px solid var(--color-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+            background: activeTab === 'telemetry' ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+            color: activeTab === 'telemetry' ? 'var(--color-primary)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: activeTab === 'telemetry' ? '0 0 12px rgba(0, 176, 255, 0.2)' : 'none'
+          }}
+        >
+          📡 {t.realTimeHydrology || 'Real-Time Telemetry'}
+        </button>
 
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
-            {t.telemetryReadingsFrom || 'Telemetry readings from'} <strong>{telemetry.station}</strong>.
-          </p>
+        <button
+          className={`dashboard-tab-btn ${activeTab === 'simulator' ? 'active' : ''}`}
+          onClick={() => setActiveTab('simulator')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            fontSize: '13.5px',
+            fontWeight: '700',
+            border: activeTab === 'simulator' ? '1px solid var(--color-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+            background: activeTab === 'simulator' ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+            color: activeTab === 'simulator' ? 'var(--color-primary)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: activeTab === 'simulator' ? '0 0 12px rgba(0, 176, 255, 0.2)' : 'none'
+          }}
+        >
+          🧠 {t.aiPredictionSimulator || 'AI Prediction Simulator'}
+        </button>
 
-          {/* Telemetry Gauge Cards */}
-          <div className="telemetry-grid">
-            <div className="telemetry-card">
-              <div className="card-label">{t.waterLevel || 'Water Level'}</div>
-              <div className="card-value">
-                {telemetry.water_level_m} <span className="card-unit">m</span>
-              </div>
+        {userRole === 'authority' && (
+          <button
+            className={`dashboard-tab-btn ${activeTab === 'user-management' ? 'active' : ''}`}
+            onClick={() => setActiveTab('user-management')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '12px',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              border: activeTab === 'user-management' ? '1px solid #00e676' : '1px solid rgba(255, 255, 255, 0.08)',
+              background: activeTab === 'user-management' ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+              color: activeTab === 'user-management' ? '#00e676' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: activeTab === 'user-management' ? '0 0 12px rgba(0, 230, 118, 0.2)' : 'none'
+            }}
+          >
+            👥 {t.userManagement || 'User Management'}
+          </button>
+        )}
+      </div>
+
+      {/* TAB CONTENT 1: REAL-TIME TELEMETRY */}
+      {activeTab === 'telemetry' && (
+        <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <section className="panel pulsing-glow">
+            <div className="panel-header">
+              <h2 className="panel-title">{t.realTimeHydrology || '📡 Real-Time Hydrology Telemetry'}</h2>
+              <button 
+                className="btn btn-secondary" 
+                onClick={fetchTelemetry}
+                disabled={loadingTelemetry}
+              >
+                {loadingTelemetry ? (t.refreshingSensors || 'Refreshing Sensors...') : (t.pollSensors || '🔄 Poll Sensors')}
+              </button>
             </div>
 
-            <div className="telemetry-card">
-              <div className="card-label">{t.riverDischarge || 'River Discharge'}</div>
-              <div className="card-value">
-                {telemetry.flow_rate_m3s} <span className="card-unit">m³/s</span>
-              </div>
-            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+              {t.telemetryReadingsFrom || 'Telemetry readings from'} <strong>{telemetry.station}</strong>.
+            </p>
 
-            <div className="telemetry-card" style={{ position: 'relative' }}>
-              <div className="card-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{t.precipitationWeather || 'Precipitation / Weather'}</span>
-                {liveWeather.isLive && (
-                  <span className="live-badge" style={{
-                    fontSize: '9px',
-                    background: 'rgba(0, 176, 255, 0.2)',
-                    color: 'var(--color-primary)',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(0, 176, 255, 0.3)',
-                    fontWeight: '700',
-                    letterSpacing: '0.5px'
-                  }}>
-                    ● LIVE WEATHER
-                  </span>
+            {/* Telemetry Gauge Cards */}
+            <div className="telemetry-grid">
+              <div className="telemetry-card">
+                <div className="card-label">{t.waterLevel || 'Water Level'}</div>
+                <div className="card-value">
+                  {telemetry.water_level_m} <span className="card-unit">m</span>
+                </div>
+              </div>
+
+              <div className="telemetry-card">
+                <div className="card-label">{t.riverDischarge || 'River Discharge'}</div>
+                <div className="card-value">
+                  {telemetry.flow_rate_m3s} <span className="card-unit">m³/s</span>
+                </div>
+              </div>
+
+              <div className="telemetry-card" style={{ position: 'relative' }}>
+                <div className="card-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{t.precipitationWeather || 'Precipitation / Weather'}</span>
+                  {liveWeather.isLive && (
+                    <span className="live-badge" style={{
+                      fontSize: '9px',
+                      background: 'rgba(0, 176, 255, 0.2)',
+                      color: 'var(--color-primary)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(0, 176, 255, 0.3)',
+                      fontWeight: '700',
+                      letterSpacing: '0.5px'
+                    }}>
+                      ● LIVE WEATHER
+                    </span>
+                  )}
+                </div>
+                {liveWeather.isLive ? (
+                  <div style={{ marginTop: '6px' }}>
+                    <div className="card-value" style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                      <span>{liveWeather.temp} <span className="card-unit">°C</span></span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400', textTransform: 'capitalize' }}>
+                        {liveWeather.description} ({liveWeather.locationName})
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                      <div>💧 Humid: <strong>{liveWeather.humidity}%</strong></div>
+                      <div>🌧️ Rain: <strong>{liveWeather.rainChance}%</strong></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card-value">
+                    {telemetry.precipitation_mm} <span className="card-unit">mm</span>
+                  </div>
                 )}
               </div>
-              {liveWeather.isLive ? (
-                <div style={{ marginTop: '6px' }}>
-                  <div className="card-value" style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                    <span>{liveWeather.temp} <span className="card-unit">°C</span></span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400', textTransform: 'capitalize' }}>
-                      {liveWeather.description} ({liveWeather.locationName})
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                    <div>💧 Humid: <strong>{liveWeather.humidity}%</strong></div>
-                    <div>🌧️ Rain: <strong>{liveWeather.rainChance}%</strong></div>
-                  </div>
-                </div>
-              ) : (
+
+              <div className="telemetry-card">
+                <div className="card-label">{t.soilMoisture || 'Soil Moisture'}</div>
                 <div className="card-value">
-                  {telemetry.precipitation_mm} <span className="card-unit">mm</span>
+                  {telemetry.soil_moisture_pct} <span className="card-unit">%</span>
                 </div>
-              )}
-            </div>
-
-            <div className="telemetry-card">
-              <div className="card-label">{t.soilMoisture || 'Soil Moisture'}</div>
-              <div className="card-value">
-                {telemetry.soil_moisture_pct} <span className="card-unit">%</span>
               </div>
             </div>
-          </div>
 
-          {/* Hydrographic Visualizer Panel */}
-          <div className="visualizer-container">
-            <div className="sensor-node" style={{ left: '30%', bottom: `${Math.min(90, Math.max(10, percentageFilled))}%` }}></div>
-            <div className="sensor-node" style={{ left: '75%', bottom: `${Math.min(90, Math.max(10, percentageFilled - 5))}%` }}></div>
-            
-            <svg className="river-svg" preserveAspectRatio="none" viewBox="0 0 400 220">
-              <defs>
-                <linearGradient id="river-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(0, 176, 255, 0.75)" />
-                  <stop offset="100%" stopColor="rgba(10, 12, 16, 0.95)" />
-                </linearGradient>
-              </defs>
+            {/* Hydrographic Visualizer Panel */}
+            <div className="visualizer-container">
+              <div className="sensor-node" style={{ left: '30%', bottom: `${Math.min(90, Math.max(10, percentageFilled))}%` }}></div>
+              <div className="sensor-node" style={{ left: '75%', bottom: `${Math.min(90, Math.max(10, percentageFilled - 5))}%` }}></div>
               
-              <path 
-                className="river-fill river-wave"
-                d={`M 0 ${waveYCoord} 
-                    Q 100 ${waveYCoord - 10}, 200 ${waveYCoord} 
-                    T 400 ${waveYCoord} 
-                    L 400 220 L 0 220 Z`}
-              />
-              <path 
-                className="river-fill"
-                opacity="0.4"
-                d={`M 0 ${waveYCoord + 8} 
-                    Q 120 ${waveYCoord - 2}, 240 ${waveYCoord + 5} 
-                    T 400 ${waveYCoord + 8} 
-                    L 400 220 L 0 220 Z`}
-              />
-            </svg>
-          </div>
-
-          {/* Active Hydrological Alerts Callout */}
-          <div className="alert-callout">
-            <span className={`alert-indicator ${telemetry.alert_status}`}>
-              {telemetry.alert_status}
-            </span>
-            <div className="alert-message">
-              <strong>{t.systemStatus || 'System Status:'}</strong> {telemetry.alert_desc}
+              <svg className="river-svg" preserveAspectRatio="none" viewBox="0 0 400 220">
+                <defs>
+                  <linearGradient id="river-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(0, 176, 255, 0.75)" />
+                    <stop offset="100%" stopColor="rgba(10, 12, 16, 0.95)" />
+                  </linearGradient>
+                </defs>
+                
+                <path 
+                  className="river-fill river-wave"
+                  d={`M 0 ${waveYCoord} 
+                      Q 100 ${waveYCoord - 10}, 200 ${waveYCoord} 
+                      T 400 ${waveYCoord} 
+                      L 400 220 L 0 220 Z`}
+                />
+                <path 
+                  className="river-fill"
+                  opacity="0.4"
+                  d={`M 0 ${waveYCoord + 8} 
+                      Q 120 ${waveYCoord - 2}, 240 ${waveYCoord + 5} 
+                      T 400 ${waveYCoord + 8} 
+                      L 400 220 L 0 220 Z`}
+                />
+              </svg>
             </div>
-          </div>
-        </section>
 
-        {/* Right Side: AI Flood Risk Simulator */}
-        <section className="panel">
-        <h2 className="panel-title" style={{ marginBottom: '8px' }}>{t.aiPredictionSimulator || '🧠 AI Prediction Simulator'}</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
-          {t.simulatorSubtitle || 'Simulate flood risk by invoking the AI predictive models.'}
-        </p>
-
-        {/* Form Controls */}
-        <form onSubmit={runPredictionSimulation}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="sim_zone_name">{t.targetZoneName || 'Target Zone Name'}</label>
-            <input 
-              type="text" 
-              id="sim_zone_name" 
-              className="form-input" 
-              value={simInputs.zone_name}
-              onChange={(e) => handleInputChange('zone_name', e.target.value)}
-              required
-              disabled={runningSim}
-            />
-          </div>
-
-          <div className="control-group">
-            <div className="control-label-row">
-              <span>{t.rainfallLevel || 'Rainfall Level'}</span>
-              <span className="control-val">{simInputs.rainfall_mm} mm</span>
-            </div>
-            <input 
-              type="range" 
-              className="range-slider" 
-              min="0" 
-              max="150" 
-              step="1"
-              value={simInputs.rainfall_mm} 
-              onChange={(e) => handleInputChange('rainfall_mm', e.target.value)}
-              disabled={runningSim}
-            />
-          </div>
-
-          <div className="control-group">
-            <div className="control-label-row">
-              <span>{t.waterLevelBaseline || 'Water Level Baseline'}</span>
-              <span className="control-val">{simInputs.water_level_m} m</span>
-            </div>
-            <input 
-              type="range" 
-              className="range-slider" 
-              min="0" 
-              max="10" 
-              step="0.1"
-              value={simInputs.water_level_m} 
-              onChange={(e) => handleInputChange('water_level_m', e.target.value)}
-              disabled={runningSim}
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: '100%', marginTop: '8px' }} 
-            disabled={runningSim}
-          >
-            {runningSim ? (t.runningPredictionBtn || 'Running AI Model...') : (t.runPredictionBtn || '🧠 Run Prediction')}
-          </button>
-        </form>
-
-        {/* Prediction Output Results */}
-        {hasPredicted && (
-          <div className="prediction-output-card" style={{ marginTop: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                {t.predictionResult || 'Prediction Result'}
+            {/* Active Hydrological Alerts Callout */}
+            <div className="alert-callout">
+              <span className={`alert-indicator ${telemetry.alert_status}`}>
+                {telemetry.alert_status}
               </span>
-              {firestoreSaved && (
-                <span style={{ fontSize: '11px', color: 'var(--color-success)', fontWeight: '600' }}>
-                  {t.savedToFirestore || '✓ Saved to Firestore'}
-                </span>
-              )}
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                {t.forecastFor || 'Forecast for'} <strong>{simOutput.zone_name}</strong>
-              </div>
-              <span className={`alert-indicator ${simOutput.risk}`} style={{ fontSize: '18px', padding: '10px 24px', borderRadius: '8px' }}>
-                {simOutput.risk}
-              </span>
-            </div>
-
-            <div className="prediction-stats" style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
-              <div className="stat-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="stat-label" style={{ margin: 0 }}>{t.modelConfidence || 'Model Confidence'}</span>
-                <span className="stat-val" style={{ color: 'var(--color-primary)', fontWeight: '700' }}>{simOutput.confidence}%</span>
+              <div className="alert-message">
+                <strong>{t.systemStatus || 'System Status:'}</strong> {telemetry.alert_desc}
               </div>
             </div>
-          </div>
-        )}
-      </section>
-
-      {/* User Management Panel (Authority Role Only) */}
-      {userRole === 'authority' && (
-        <section className="panel" style={{ marginTop: '24px', gridColumn: '1 / -1' }}>
-          <div className="panel-header" style={{ marginBottom: '12px' }}>
-            <h2 className="panel-title">👥 User Management & Sighting Audit</h2>
-            <span className="user-email-badge" style={{ fontSize: '11px' }}>
-              Authority Portal
-            </span>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
-            List of registered users and submitted report counts. Click a user to view their submitted incident reports inline.
-          </p>
-
-          {userMgmtLoading ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px', textAlign: 'center' }}>
-              Loading registered users and reports...
-            </div>
-          ) : usersList.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px', textAlign: 'center' }}>
-              No users found.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {usersList.map(user => {
-                const isSelected = selectedUserEmail === user.email;
-                return (
-                  <div 
-                    key={user.email} 
-                    style={{ 
-                      background: 'rgba(255, 255, 255, 0.02)', 
-                      border: isSelected ? '1px solid var(--color-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '14px',
-                      overflow: 'hidden',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {/* User Row Header */}
-                    <div 
-                      onClick={() => setSelectedUserEmail(isSelected ? null : user.email)}
-                      style={{
-                        padding: '14px 18px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        background: isSelected ? 'rgba(0, 176, 255, 0.06)' : 'transparent'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '18px' }}>👤</span>
-                        <div>
-                          <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-bright)' }}>
-                            {user.email}
-                          </div>
-                          <span style={{ 
-                            fontSize: '10px', 
-                            fontWeight: '700', 
-                            padding: '2px 6px', 
-                            borderRadius: '4px', 
-                            textTransform: 'uppercase',
-                            background: user.role === 'authority' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                            color: user.role === 'authority' ? '#00e676' : 'var(--text-muted)'
-                          }}>
-                            {user.role === 'authority' ? '🏛️ Authority' : 'Citizen'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          background: user.reportCount > 0 ? 'rgba(0, 176, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          color: user.reportCount > 0 ? 'var(--color-primary)' : 'var(--text-muted)',
-                          border: `1px solid ${user.reportCount > 0 ? 'rgba(0, 176, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`
-                        }}>
-                          📋 {user.reportCount} {user.reportCount === 1 ? 'Report' : 'Reports'}
-                        </span>
-                        <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                          {isSelected ? '▲' : '▼'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Inline Expanded User Detail View */}
-                    {isSelected && (
-                      <div style={{ padding: '16px 18px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0, 0, 0, 0.2)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                          <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-bright)' }}>
-                            Reports Submitted by <span style={{ color: 'var(--color-primary)' }}>{user.email}</span>
-                          </h4>
-                          <button 
-                            className="btn btn-secondary" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedUserEmail(null);
-                            }}
-                            style={{ padding: '4px 10px', fontSize: '11px' }}
-                          >
-                            Close Details
-                          </button>
-                        </div>
-
-                        {user.reports.length === 0 ? (
-                          <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '12px 0' }}>
-                            This user has not submitted any incident reports yet.
-                          </div>
-                        ) : (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
-                            {user.reports.map((rep, rIdx) => {
-                              const sevUpper = (rep.severity || '').toUpperCase();
-                              return (
-                                <div 
-                                  key={rep.id || rIdx} 
-                                  style={{
-                                    background: 'rgba(20, 24, 33, 0.8)',
-                                    border: '1px solid var(--border-muted)',
-                                    borderRadius: '12px',
-                                    padding: '14px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '8px'
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-bright)' }}>
-                                      📍 {rep.location || 'Unknown Location'}
-                                    </span>
-                                    <span className={`alert-indicator ${sevUpper}`} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px' }}>
-                                      {rep.severity || 'ELEVATED'}
-                                    </span>
-                                  </div>
-                                  <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-main)', lineHeight: '1.4' }}>
-                                    {rep.details || 'No additional details provided.'}
-                                  </p>
-                                  {rep.photoUrl && (
-                                    <div style={{ marginTop: '4px' }}>
-                                      <img 
-                                        src={rep.photoUrl} 
-                                        alt="User Incident Sighting" 
-                                        style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} 
-                                      />
-                                    </div>
-                                  )}
-                                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                    🕒 {getTimeAgo(rep.timestamp)}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+          </section>
+        </main>
       )}
-    </main>
+
+      {/* TAB CONTENT 2: AI PREDICTION SIMULATOR */}
+      {activeTab === 'simulator' && (
+        <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <section className="panel">
+            <h2 className="panel-title" style={{ marginBottom: '8px' }}>{t.aiPredictionSimulator || '🧠 AI Prediction Simulator'}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
+              {t.simulatorSubtitle || 'Simulate flood risk by invoking the AI predictive models.'}
+            </p>
+
+            {/* Form Controls */}
+            <form onSubmit={runPredictionSimulation}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="sim_zone_name">{t.targetZoneName || 'Target Zone Name'}</label>
+                <input 
+                  type="text" 
+                  id="sim_zone_name" 
+                  className="form-input" 
+                  value={simInputs.zone_name}
+                  onChange={(e) => handleInputChange('zone_name', e.target.value)}
+                  required
+                  disabled={runningSim}
+                />
+              </div>
+
+              <div className="control-group">
+                <div className="control-label-row">
+                  <span>{t.rainfallLevel || 'Rainfall Level'}</span>
+                  <span className="control-val">{simInputs.rainfall_mm} mm</span>
+                </div>
+                <input 
+                  type="range" 
+                  className="range-slider" 
+                  min="0" 
+                  max="150" 
+                  step="1"
+                  value={simInputs.rainfall_mm} 
+                  onChange={(e) => handleInputChange('rainfall_mm', e.target.value)}
+                  disabled={runningSim}
+                />
+              </div>
+
+              <div className="control-group">
+                <div className="control-label-row">
+                  <span>{t.waterLevelBaseline || 'Water Level Baseline'}</span>
+                  <span className="control-val">{simInputs.water_level_m} m</span>
+                </div>
+                <input 
+                  type="range" 
+                  className="range-slider" 
+                  min="0" 
+                  max="10" 
+                  step="0.1"
+                  value={simInputs.water_level_m} 
+                  onChange={(e) => handleInputChange('water_level_m', e.target.value)}
+                  disabled={runningSim}
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', marginTop: '8px' }} 
+                disabled={runningSim}
+              >
+                {runningSim ? (t.runningPredictionBtn || 'Running AI Model...') : (t.runPredictionBtn || '🧠 Run Prediction')}
+              </button>
+            </form>
+
+            {/* Prediction Output Results */}
+            {hasPredicted && (
+              <div className="prediction-output-card" style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    {t.predictionResult || 'Prediction Result'}
+                  </span>
+                  {firestoreSaved && (
+                    <span style={{ fontSize: '11px', color: 'var(--color-success)', fontWeight: '600' }}>
+                      {t.savedToFirestore || '✓ Saved to Firestore'}
+                    </span>
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    {t.forecastFor || 'Forecast for'} <strong>{simOutput.zone_name}</strong>
+                  </div>
+                  <span className={`alert-indicator ${simOutput.risk}`} style={{ fontSize: '18px', padding: '10px 24px', borderRadius: '8px' }}>
+                    {simOutput.risk}
+                  </span>
+                </div>
+
+                <div className="prediction-stats" style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
+                  <div className="stat-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="stat-label" style={{ margin: 0 }}>{t.modelConfidence || 'Model Confidence'}</span>
+                    <span className="stat-val" style={{ color: 'var(--color-primary)', fontWeight: '700' }}>{simOutput.confidence}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        </main>
+      )}
+
+      {/* TAB CONTENT 3: MUNICIPAL USER MANAGEMENT (Authority Role Only) */}
+      {activeTab === 'user-management' && userRole === 'authority' && (
+        <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <section className="panel" style={{ padding: '24px' }}>
+            <div className="panel-header" style={{ marginBottom: '16px' }}>
+              <div>
+                <h2 className="panel-title">👥 Municipal User Management & Incident Audit</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Inspect registered user profiles and audit submitted incident reports in real-time.
+                </p>
+              </div>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: '700',
+                padding: '4px 10px',
+                borderRadius: '12px',
+                background: 'rgba(0, 230, 118, 0.15)',
+                color: '#00e676',
+                border: '1px solid rgba(0, 230, 118, 0.3)'
+              }}>
+                Authority Portal
+              </span>
+            </div>
+
+            {userMgmtLoading ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '24px', textAlign: 'center' }}>
+                Loading registered users and reports...
+              </div>
+            ) : usersList.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '24px', textAlign: 'center' }}>
+                No registered users found.
+              </div>
+            ) : (
+              <div className="user-management-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                {/* User Selector List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Registered Accounts ({usersList.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {usersList.map(user => {
+                      const isSelected = selectedUserEmail === user.email;
+                      return (
+                        <div 
+                          key={user.email} 
+                          onClick={() => setSelectedUserEmail(isSelected ? null : user.email)}
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            background: isSelected ? 'rgba(0, 176, 255, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                            border: isSelected ? '1px solid var(--color-primary)' : '1px solid rgba(255, 255, 255, 0.06)',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '18px' }}>👤</span>
+                            <div>
+                              <div style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-bright)' }}>
+                                {user.email}
+                              </div>
+                              <span style={{ 
+                                fontSize: '10px', 
+                                fontWeight: '700', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px', 
+                                textTransform: 'uppercase',
+                                background: user.role === 'authority' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                                color: user.role === 'authority' ? '#00e676' : 'var(--text-muted)'
+                              }}>
+                                {user.role === 'authority' ? '🏛️ Authority' : 'Citizen'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              fontSize: '11.5px',
+                              fontWeight: '700',
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              background: user.reportCount > 0 ? 'rgba(0, 176, 255, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                              color: user.reportCount > 0 ? 'var(--color-primary)' : 'var(--text-muted)',
+                              border: `1px solid ${user.reportCount > 0 ? 'rgba(0, 176, 255, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`
+                            }}>
+                              📋 {user.reportCount}
+                            </span>
+                            <span style={{ fontSize: '12px', color: isSelected ? 'var(--color-primary)' : 'var(--text-muted)' }}>
+                              {isSelected ? '▶' : '❯'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Selected User Incident Reports Inspector */}
+                <div style={{ background: 'rgba(0, 0, 0, 0.25)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.06)', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                  {selectedUserEmail ? (
+                    (() => {
+                      const selectedUserObj = usersList.find(u => u.email === selectedUserEmail);
+                      const reports = selectedUserObj?.reports || [];
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                Incident Sighting Inspector
+                              </div>
+                              <h4 style={{ margin: '2px 0 0', fontSize: '15px', color: 'var(--text-bright)' }}>
+                                Reports by <span style={{ color: 'var(--color-primary)' }}>{selectedUserEmail}</span>
+                              </h4>
+                            </div>
+
+                            <button 
+                              className="btn btn-secondary"
+                              onClick={() => setSelectedUserEmail(null)}
+                              style={{ padding: '4px 10px', fontSize: '11px' }}
+                            >
+                              Clear Inspector
+                            </button>
+                          </div>
+
+                          {reports.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                              <span style={{ fontSize: '28px', display: 'block', marginBottom: '8px' }}>📑</span>
+                              This user has not submitted any incident sightings yet.
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '440px', overflowY: 'auto', paddingRight: '4px' }}>
+                              {reports.map((rep, rIdx) => {
+                                const sevUpper = (rep.severity || '').toUpperCase();
+                                return (
+                                  <div 
+                                    key={rep.id || rIdx}
+                                    style={{
+                                      background: 'rgba(20, 24, 33, 0.8)',
+                                      border: '1px solid var(--border-muted)',
+                                      borderRadius: '12px',
+                                      padding: '14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-bright)' }}>
+                                        📍 {rep.location || 'Unknown Location'}
+                                      </span>
+                                      <span className={`alert-indicator ${sevUpper}`} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px' }}>
+                                        {rep.severity || 'ELEVATED'}
+                                      </span>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                                      {rep.details || 'No additional observations recorded.'}
+                                    </p>
+                                    {rep.photoUrl && (
+                                      <div style={{ marginTop: '4px' }}>
+                                        <img 
+                                          src={rep.photoUrl} 
+                                          alt="User Incident Sighting Document" 
+                                          style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} 
+                                        />
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      🕒 {getTimeAgo(rep.timestamp)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: '36px', marginBottom: '12px' }}>👈</span>
+                      <h4 style={{ margin: '0 0 6px', color: 'var(--text-bright)', fontSize: '15px' }}>
+                        Select a Registered Account
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', maxWidth: '280px', lineHeight: '1.4' }}>
+                        Click any user on the left to inspect their submitted incident sightings, location telemetry, and attached photo evidence.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        </main>
+      )}
     </div>
   );
 }
