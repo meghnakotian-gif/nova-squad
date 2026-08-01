@@ -1502,67 +1502,147 @@ body {
   color: #ffffff;
 }
 
-/* Light Theme Overrides for Dashboard */
-.dashboard-theme-light {
-  background: #f8fafc !important;
+/* App-Wide Theme System Overrides */
+body.app-theme-light, .app-theme-light, .dashboard-theme-light {
+  --bg-main: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-card-hover: #f1f5f9;
+  --border-muted: #cbd5e1;
+  --text-main: #334155;
+  --text-muted: #64748b;
+  --text-bright: #0f172a;
+  background-color: #f8fafc !important;
   color: #0f172a !important;
-  padding: 16px;
-  border-radius: 12px;
 }
+
+body.app-theme-light .panel,
+body.app-theme-light .info-card,
+body.app-theme-light .auth-layout,
+body.app-theme-light .report-layout,
+body.app-theme-light .header-navbar,
+body.app-theme-light .dashboard-container,
+.app-theme-light .panel,
+.app-theme-light .info-card,
+.app-theme-light .auth-layout,
+.app-theme-light .report-layout,
+.app-theme-light .header-navbar,
+.app-theme-light .dashboard-container,
 .dashboard-theme-light .panel {
   background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+  border-color: #cbd5e1 !important;
   color: #0f172a !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
 }
+
+body.app-theme-light h1,
+body.app-theme-light h2,
+body.app-theme-light h3,
+body.app-theme-light h4,
+body.app-theme-light .panel-title,
+body.app-theme-light strong,
+.app-theme-light h1,
+.app-theme-light h2,
+.app-theme-light h3,
+.app-theme-light h4,
+.app-theme-light .panel-title,
+.app-theme-light strong,
 .dashboard-theme-light .panel-title,
 .dashboard-theme-light h2,
 .dashboard-theme-light h3,
 .dashboard-theme-light strong {
   color: #0f172a !important;
 }
+
+body.app-theme-light .telemetry-card,
+.app-theme-light .telemetry-card,
 .dashboard-theme-light .telemetry-card {
   background: #f1f5f9 !important;
   border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
 }
+
+body.app-theme-light .card-value,
+.app-theme-light .card-value,
 .dashboard-theme-light .card-value {
   color: #0284c7 !important;
 }
+
+body.app-theme-light .theme-switcher-dropdown,
+.app-theme-light .theme-switcher-dropdown,
 .dashboard-theme-light .theme-switcher-dropdown {
   background: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
 }
+
+body.app-theme-light .theme-switcher-dropdown option,
+.app-theme-light .theme-switcher-dropdown option,
 .dashboard-theme-light .theme-switcher-dropdown option {
   background: #ffffff;
   color: #0f172a;
 }
 
-/* Ocean Blue Theme Overrides for Dashboard */
-.dashboard-theme-ocean {
-  background: #0b192c !important;
+/* Ocean Blue App-Wide Theme Overrides */
+body.app-theme-ocean, .app-theme-ocean, .dashboard-theme-ocean {
+  --bg-main: #0b192c;
+  --bg-card: rgba(30, 62, 98, 0.85);
+  --bg-card-hover: #162f4d;
+  --border-muted: #008dda;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-bright: #38bdf8;
+  background-color: #0b192c !important;
   color: #e2e8f0 !important;
-  padding: 16px;
-  border-radius: 12px;
 }
+
+body.app-theme-ocean .panel,
+body.app-theme-ocean .info-card,
+body.app-theme-ocean .auth-layout,
+body.app-theme-ocean .report-layout,
+body.app-theme-ocean .header-navbar,
+body.app-theme-ocean .dashboard-container,
+.app-theme-ocean .panel,
+.app-theme-ocean .info-card,
+.app-theme-ocean .auth-layout,
+.app-theme-ocean .report-layout,
+.app-theme-ocean .header-navbar,
+.app-theme-ocean .dashboard-container,
 .dashboard-theme-ocean .panel {
   background: #1e3e62 !important;
-  border: 1px solid #008dda !important;
-  box-shadow: 0 4px 20px rgba(0, 141, 218, 0.2) !important;
+  border-color: #008dda !important;
   color: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(0, 141, 218, 0.2) !important;
 }
+
+body.app-theme-ocean h1,
+body.app-theme-ocean h2,
+body.app-theme-ocean h3,
+body.app-theme-ocean h4,
+body.app-theme-ocean .panel-title,
+body.app-theme-ocean strong,
+.app-theme-ocean h1,
+.app-theme-ocean h2,
+.app-theme-ocean h3,
+.app-theme-ocean h4,
+.app-theme-ocean .panel-title,
+.app-theme-ocean strong,
 .dashboard-theme-ocean .panel-title,
 .dashboard-theme-ocean h2,
 .dashboard-theme-ocean h3,
 .dashboard-theme-ocean strong {
   color: #38bdf8 !important;
 }
+
+body.app-theme-ocean .telemetry-card,
+.app-theme-ocean .telemetry-card,
 .dashboard-theme-ocean .telemetry-card {
   background: #001f3f !important;
   border: 1px solid #38bdf8 !important;
   color: #ffffff !important;
 }
+
+body.app-theme-ocean .card-value,
+.app-theme-ocean .card-value,
 .dashboard-theme-ocean .card-value {
   color: #38bdf8 !important;
 }

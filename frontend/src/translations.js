@@ -55,6 +55,8 @@ export const translations = {
     mapHotspotsSynced: "Map hotspots synced to Cloud Firestore in real-time.",
     connectingDatabase: "Connecting to database...",
     noTelemetryAvailable: "No telemetry points available.",
+    shareRoute: "Share Route",
+    copied: "Copied!",
 
     // Report Incident View
     reportLocalIncident: "Report Local Incident",
@@ -79,7 +81,8 @@ export const translations = {
     submitAnotherReport: "Submit Another Report",
 
     // Dashboard View
-    dashboardThemeLabel: "🎨 Dashboard Theme:",
+    themeLabel: "🎨 Theme:",
+    dashboardThemeLabel: "🎨 Theme:",
     themeDark: "🌙 Dark Space (Default)",
     themeLight: "☀️ Light Mode",
     themeOcean: "🌊 Ocean Blue",
@@ -178,7 +181,9 @@ export const translations = {
     currentLevel: "ಪ್ರಸ್ತುತ ಮಟ್ಟ:",
     mapHotspotsSynced: "ನಕ್ಷೆಯ ಡೇಟಾ ಫೈರ್‌ಸ್ಟೋರ್ ಜೊತೆ ಲೈವ್ ಸಿಂಕ್ ಆಗಿದೆ.",
     connectingDatabase: "ಡೇಟಾಬೇಸ್‌ಗೆ ಸಂಪರ್ಕಿಸಲಾಗುತ್ತಿದೆ...",
-    noTelemetryAvailable: "ಯಾವುದೇ ಮಾಹಿತ ಲಭ್ಯವಿಲ್ಲ.",
+    noTelemetryAvailable: "ಯಾವುದೇ ಟೆಲಿಮೆಟ್ರಿ ಪಾಯಿಂಟ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+    shareRoute: "ಮಾರ್ಗವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ",
+    copied: "ನಕಲಿಸಲಾಗಿದೆ!",
 
     // Report Incident View
     reportLocalIncident: "ಸ್ಥಳೀಯ ಘಟನೆ ವರದಿ ಮಾಡಿ",
@@ -203,7 +208,8 @@ export const translations = {
     submitAnotherReport: "ಮತ್ತೊಂದು ವರದಿ ಸಲ್ಲಿಸಿ",
 
     // Dashboard View
-    dashboardThemeLabel: "🎨 ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಥೀಮ್:",
+    themeLabel: "🎨 ಥೀಮ್:",
+    dashboardThemeLabel: "🎨 ಥೀಮ್:",
     themeDark: "🌙 ಡಾರ್ಕ್ ಸ್ಪೇಸ್ (ಡೀಫಾಲ್ಟ್)",
     themeLight: "☀️ ಲೈಟ್ ಮೋಡ್",
     themeOcean: "🌊 ಓಷನ್ ಬ್ಲೂ",
@@ -301,8 +307,10 @@ export const translations = {
     zoneInformation: "📍 क्षेत्र की जानकारी",
     currentLevel: "वर्तमान स्तर:",
     mapHotspotsSynced: "मानचित्र डेटा वास्तविक समय में सिंक है।",
-    connectingDatabase: "डेटाबेस से जुड़ रहा है...",
-    noTelemetryAvailable: "कोई डेटा उपलब्ध नहीं है।",
+    connectingDatabase: "डेटाबेस से कनेक्ट हो रहा है...",
+    noTelemetryAvailable: "कोई टेलीमेट्री बिंदु उपलब्ध नहीं है।",
+    shareRoute: "मार्ग साझा करें",
+    copied: "कॉपी हो गया!",
 
     // Report Incident View
     reportLocalIncident: "स्थानीय घटना की रिपोर्ट करें",
@@ -327,7 +335,8 @@ export const translations = {
     submitAnotherReport: "दूसरी रिपोर्ट दर्ज करें",
 
     // Dashboard View
-    dashboardThemeLabel: "🎨 डैशबोर्ड थीम:",
+    themeLabel: "🎨 थीम:",
+    dashboardThemeLabel: "🎨 थीम:",
     themeDark: "🌙 डार्क स्पेस (डिफ़ॉल्ट)",
     themeLight: "☀️ लाइट मोड",
     themeOcean: "🌊 ओशन ब्लू",
@@ -425,8 +434,10 @@ export const translations = {
     zoneInformation: "📍 ಜಾಗೊದ ಮಾಹಿತಿ",
     currentLevel: "ಇತ್ತೆ ಉಪ್ಪುನ ಮಟ್ಟ:",
     mapHotspotsSynced: "ಮ್ಯಾಪ್ ಡೇಟಾ ರಿಯಲ್ ಟೈಮ್‌ಡ್ ಲೈವ್ ಆತುಂಡು.",
-    connectingDatabase: "ಡೇಟಾಬೇಸ್‌ಗ್ ಕನೆಕ್ಟ್ ಆಪೊಂದುಂಡು...",
-    noTelemetryAvailable: "ದಾಲ ಮಾಹಿತಿ ಇಜ್ಜಿ.",
+    connectingDatabase: "ಡೇಟಾಬೇಸ್‌ಗ್ ಸಂಪರ್ಕ ಆವೊಂದುಂಡು...",
+    noTelemetryAvailable: "ಯಾವುದೇ ಟೆಲಿಮೆಟ್ರಿ ಪಾಯಿಂಟ್‌ಗಳು ಇಜ್ಜಿ.",
+    shareRoute: "ಮಾರ್ಗ ಹಂಚಿಲೆ",
+    copied: "ಕಾಪಿ ಆಂಡ್!",
 
     // Report Incident View
     reportLocalIncident: "ಘಟನೆ ಮಾಹಿತಿ ಕಡಪುಡುಲೆ",
@@ -451,7 +462,8 @@ export const translations = {
     submitAnotherReport: "ಮತ್ತೊಂಜಿ ಮಾಹಿತಿ ಕಡಪುಡುಲೆ",
 
     // Dashboard View
-    dashboardThemeLabel: "🎨 ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಥೀಮ್:",
+    themeLabel: "🎨 ಥೀಮ್:",
+    dashboardThemeLabel: "🎨 ಥೀಮ್:",
     themeDark: "🌙 ಡಾರ್ಕ್ ಸ್ಪೇಸ್",
     themeLight: "☀️ ಲೈಟ್ ಮೋಡ್",
     themeOcean: "🌊 ಓಷನ್ ಬ್ಲೂ",
@@ -549,8 +561,10 @@ export const translations = {
     zoneInformation: "📍 മേഖല വിവരങ്ങൾ",
     currentLevel: "നിലവിലെ നിരപ്പ്:",
     mapHotspotsSynced: "മാപ്പ് വിവരങ്ങൾ ഫയർസ്റ്റോറുമായി തത്സമയം സിങ്ക് ചെയ്തിരിക്കുന്നു.",
-    connectingDatabase: "ഡാറ്റാബേസിലേക്ക് കണക്റ്റ് ചെയ്യുന്നു...",
-    noTelemetryAvailable: "ടെലിമെട്രി വിവരങ്ങളൊന്നും ലഭ്യമല്ല.",
+    connectingDatabase: "ഡാറ്റാബേസിലേക്ക് ബന്ധിപ്പിക്കുന്നു...",
+    noTelemetryAvailable: "ടെലിമെട്രി പോയിന്റുകളൊന്നും ലഭ്യമല്ല.",
+    shareRoute: "റൂട്ട് പങ്കിടുക",
+    copied: "പകർത്തി!",
 
     // Report Incident View
     reportLocalIncident: "സംഭവം റിപ്പോർട്ട് ചെയ്യുക",
@@ -575,7 +589,8 @@ export const translations = {
     submitAnotherReport: "മറ്റൊരു റിപ്പോർട്ട് സമർപ്പിക്കുക",
 
     // Dashboard View
-    dashboardThemeLabel: "🎨 ഡാഷ്ബോർഡ് തീം:",
+    themeLabel: "🎨 തീം:",
+    dashboardThemeLabel: "🎨 തീം:",
     themeDark: "🌙 ഡാർക്ക് സ്പേസ്",
     themeLight: "☀️ ലൈറ്റ് മോഡ്",
     themeOcean: "🌊 ഓഷ്യൻ ബ്ലൂ",

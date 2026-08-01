@@ -75,12 +75,10 @@ function getTimeAgo(timestamp, timeRaw) {
 // ROOT COMPONENT WITH ROUTER
 // ==========================================
 
-function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead, lang, setLang, t }) {
+function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead, lang, setLang, appTheme, onThemeChange, t }) {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const mobileDropdownRef = useRef(null);
 
   const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
 
@@ -100,9 +98,6 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
-      if (mobileDropdownRef.current && !mobileDropdownRef.current.contains(e.target)) {
-        setMobileDropdownOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -115,99 +110,6 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
           <h1>
             🌊 {t.brand || "NOVA Flood Squad"} <span className="brand-badge">Engine v1.0</span>
           </h1>
-
-          {/* Mobile Top Header Actions (Language Selector & Notification Bell) */}
-          <div className="mobile-header-actions">
-            <select 
-              value={lang} 
-              onChange={(e) => {
-                const selected = e.target.value;
-                setLang(selected);
-                localStorage.setItem('appLanguage', selected);
-              }}
-              className="language-selector-dropdown mobile-lang-select"
-              title="Select Language"
-              aria-label="Select Language"
-            >
-              <option value="en">🌐 English</option>
-              <option value="kn">🌐 ಕನ್ನಡ</option>
-              <option value="hi">🌐 हिन्दी</option>
-              <option value="tcy">🌐 ತುಳು</option>
-              <option value="ml">🌐 മലയാളം</option>
-            </select>
-
-            {!authLoading && currentUser && (
-              <div style={{ position: 'relative' }} ref={mobileDropdownRef}>
-                <button 
-                  className="notification-bell-btn mobile-bell-btn"
-                  onClick={() => setMobileDropdownOpen(!mobileDropdownOpen)}
-                  title="Notifications"
-                  aria-label="Notifications"
-                >
-                  🔔
-                  {unreadCount > 0 && (
-                    <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
-                  )}
-                </button>
-
-                {mobileDropdownOpen && (
-                  <div className="notification-dropdown mobile-notification-dropdown">
-                    <div className="notification-header">
-                      <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-bright)' }}>
-                        Notifications {unreadCount > 0 && <span style={{ opacity: 0.7 }}>({unreadCount} unread)</span>}
-                      </div>
-                      {unreadCount > 0 && (
-                        <button 
-                          className="mark-all-btn"
-                          onClick={onMarkAllRead}
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="notification-list">
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                          No notifications yet
-                        </div>
-                      ) : (
-                        notifications.map(item => {
-                          const isUnread = !readIds.has(item.id);
-                          const isReport = item.type === 'New Report';
-                          return (
-                            <div 
-                              key={item.id} 
-                              className={`notification-item ${isUnread ? 'unread' : ''}`}
-                              onClick={() => {
-                                onMarkRead(item.id);
-                                setMobileDropdownOpen(false);
-                              }}
-                            >
-                              <div className="notification-item-header">
-                                <span className={`notification-tag ${isReport ? 'report-tag' : 'alert-tag'}`}>
-                                  {isReport ? '📝 New Report' : '🚨 Alert'}
-                                </span>
-                                <span className="notification-time">
-                                  {getTimeAgo(item.timestamp, item.timeRaw)}
-                                </span>
-                              </div>
-                              <div className="notification-location">
-                                📍 {item.location}
-                              </div>
-                              <div className="notification-details">
-                                {item.severity ? `Severity: ${item.severity.toUpperCase()}` : ''} {item.details ? `— ${item.details}` : ''}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -215,6 +117,21 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
         {/* Navigation Bar */}
         <nav className="navbar">
           <ul className="nav-list">
+            {/* Theme Selector Dropdown (visible on all pages) */}
+            <li className="nav-item">
+              <select 
+                value={appTheme} 
+                onChange={(e) => onThemeChange(e.target.value)}
+                className="theme-switcher-dropdown"
+                title="Select Theme"
+                aria-label="Select Theme"
+              >
+                <option value="dark">{t.themeDark || '🌙 Dark Space'}</option>
+                <option value="light">{t.themeLight || '☀️ Light Mode'}</option>
+                <option value="ocean">{t.themeOcean || '🌊 Ocean Blue'}</option>
+              </select>
+            </li>
+
             {/* Language Selector Dropdown (visible on all pages) */}
             <li className="nav-item">
               <select 
@@ -420,6 +337,19 @@ function App() {
   // Multi-language localization state (persisted in localStorage, defaults to English)
   const [lang, setLang] = useState(() => localStorage.getItem('appLanguage') || 'en');
   const t = translations[lang] || translations.en;
+
+  // Global app theme state ('dark' | 'light' | 'ocean', persisted across sessions in localStorage)
+  const [appTheme, setAppTheme] = useState(() => localStorage.getItem('appTheme') || localStorage.getItem('dashboardTheme') || 'dark');
+
+  const handleThemeChange = (newTheme) => {
+    setAppTheme(newTheme);
+    localStorage.setItem('appTheme', newTheme);
+    localStorage.setItem('dashboardTheme', newTheme);
+  };
+
+  useEffect(() => {
+    document.body.className = `app-theme-${appTheme}`;
+  }, [appTheme]);
 
   // Emergency Alerts active states
   const [activeAlert, setActiveAlert] = useState(null);
@@ -649,109 +579,103 @@ function App() {
   }, [currentUser]);
 
   return (
-    <Router>
-      <HeaderNavbar 
-        backendHealthy={backendHealthy} 
-        currentUser={currentUser}
-        userRole={userRole} 
-        authLoading={authLoading}
-        notifications={notifications}
-        readIds={readNotificationIds}
-        onMarkRead={handleMarkRead}
-        onMarkAllRead={handleMarkAllRead}
-        lang={lang}
-        setLang={setLang}
-        t={t}
-      />
+    <div className={`app-wrapper app-theme-${appTheme}`} style={{ minHeight: '100vh', transition: 'all 0.3s ease' }}>
+      <Router>
+        <HeaderNavbar 
+          backendHealthy={backendHealthy} 
+          currentUser={currentUser}
+          userRole={userRole} 
+          authLoading={authLoading}
+          notifications={notifications}
+          readIds={readNotificationIds}
+          onMarkRead={handleMarkRead}
+          onMarkAllRead={handleMarkAllRead}
+          lang={lang}
+          setLang={setLang}
+          appTheme={appTheme}
+          onThemeChange={handleThemeChange}
+          t={t}
+        />
 
-      {/* Global Emergency Alert Banner */}
-      {showBanner && activeAlert && (
-        <div className="emergency-banner">
-          <div className="emergency-banner-content">
-            <span style={{ fontSize: '18px' }}>⚠️</span>
-            <span>
-              <strong>EMERGENCY ALERT:</strong> Critical risk detected in <strong>{activeAlert.zone_name}</strong>. {activeAlert.message}
-            </span>
+        {/* Global Emergency Alert Banner */}
+        {showBanner && activeAlert && (
+          <div className="emergency-banner">
+            <div className="emergency-banner-content">
+              <span style={{ fontSize: '18px' }}>⚠️</span>
+              <span>
+                <strong>EMERGENCY ALERT:</strong> Critical risk detected in <strong>{activeAlert.zone_name}</strong>. {activeAlert.message}
+              </span>
+            </div>
+            <button 
+              className="emergency-banner-btn" 
+              onClick={() => setDismissedAlertId(activeAlert.id)}
+            >
+              ✕
+            </button>
           </div>
-          <button 
-            className="emergency-banner-btn" 
-            onClick={() => setDismissedAlertId(activeAlert.id)}
-          >
-            ✕
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Routed Pages Area */}
-      <Routes>
-        <Route path="/" element={<HomeView t={t} />} />
-        <Route path="/live-map" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
-            <LiveMapView t={t} />
-          </ProtectedRoute>
-        } />
-        <Route path="/report" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
-            <ReportFloodView currentUser={currentUser} userRole={userRole} t={t} />
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
-            <DashboardView backendHealthy={backendHealthy} userRole={userRole} t={t} />
-          </ProtectedRoute>
-        } />
-        <Route path="/login" element={<LoginView t={t} />} />
-        <Route path="/signup" element={<SignupView t={t} />} />
-      </Routes>
+        {/* Routed Pages Area */}
+        <Routes>
+          <Route path="/" element={<HomeView t={t} />} />
+          <Route path="/live-map" element={
+            <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
+              <LiveMapView t={t} />
+            </ProtectedRoute>
+          } />
+          <Route path="/report" element={
+            <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
+              <ReportFloodView currentUser={currentUser} userRole={userRole} t={t} />
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
+              <DashboardView backendHealthy={backendHealthy} userRole={userRole} appTheme={appTheme} onThemeChange={handleThemeChange} t={t} />
+            </ProtectedRoute>
+          } />
+          <Route path="/login" element={<LoginView t={t} />} />
+          <Route path="/signup" element={<SignupView t={t} />} />
+        </Routes>
 
-      {/* Global Footer */}
-      <footer className="app-footer">
-        <p>
-          {t.footerText || 'Flood Pulse AI • Hydrographic Forecasting and Pulse Analysis Platform • Powered by Flask & React Vite'}
-        </p>
-      </footer>
+        {/* Global Footer */}
+        <footer className="app-footer">
+          <p>
+            {t.footerText || 'Flood Pulse AI • Hydrographic Forecasting and Pulse Analysis Platform • Powered by Flask & React Vite'}
+          </p>
+        </footer>
 
-      {/* Mobile Bottom Navigation Bar */}
-      {!authLoading && (
-        <nav className="mobile-navbar">
-          <NavLink to="/" end className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">🏠</span>
-            <span>{t.home || 'Home'}</span>
-          </NavLink>
-          {currentUser ? (
-            <>
-              <NavLink to="/live-map" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">🗺️</span>
-                <span>{t.liveMap || 'Live Map'}</span>
-              </NavLink>
-              <NavLink to="/report" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">📝</span>
-                <span>{t.reportFlood || 'Report'}</span>
-              </NavLink>
-              <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">📊</span>
-                <span>{t.dashboard || 'Dashboard'}</span>
-              </NavLink>
-              <Link to="/" onClick={() => signOut(auth)} className="mobile-nav-item">
-                <span className="mobile-nav-icon">🔓</span>
-                <span>{t.logout || 'Logout'}</span>
-              </Link>
-            </>
-          ) : (
-            <>
+        {/* Mobile Bottom Navigation Bar */}
+        {!authLoading && (
+          <nav className="mobile-navbar">
+            <NavLink to="/" end className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+              <span className="mobile-nav-icon">🏠</span>
+              <span>{t.home || 'Home'}</span>
+            </NavLink>
+            {currentUser ? (
+              <>
+                <NavLink to="/live-map" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="mobile-nav-icon">🗺️</span>
+                  <span>{t.liveMap || 'Live Map'}</span>
+                </NavLink>
+                <NavLink to="/report" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="mobile-nav-icon">📝</span>
+                  <span>{t.reportFlood || 'Report'}</span>
+                </NavLink>
+                <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="mobile-nav-icon">📊</span>
+                  <span>{t.dashboard || 'Dashboard'}</span>
+                </NavLink>
+              </>
+            ) : (
               <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">👤</span>
+                <span className="mobile-nav-icon">🔑</span>
                 <span>{t.login || 'Login'}</span>
               </NavLink>
-              <NavLink to="/signup" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">📝</span>
-                <span>{t.signup || 'Signup'}</span>
-              </NavLink>
-            </>
-          )}
-        </nav>
-      )}
-    </Router>
+            )}
+          </nav>
+        )}
+      </Router>
+    </div>
   );
 }
 
@@ -1813,6 +1737,127 @@ function LiveMapView({ t = translations.en }) {
   const [routeError, setRouteError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  // Inspect URL parameters on load for shared route deep links (?destination=...&lat=...&lng=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlDest = params.get('destination');
+    const urlLat = params.get('lat') ? parseFloat(params.get('lat')) : null;
+    const urlLng = params.get('lng') ? parseFloat(params.get('lng')) : null;
+    const urlStartLat = params.get('startLat') ? parseFloat(params.get('startLat')) : null;
+    const urlStartLng = params.get('startLng') ? parseFloat(params.get('startLng')) : null;
+    const urlStart = params.get('start');
+
+    if (urlDest) {
+      setDestInput(urlDest);
+
+      if (urlStart) {
+        setStartInput(urlStart);
+      } else if (urlStartLat !== null && urlStartLng !== null && !isNaN(urlStartLat) && !isNaN(urlStartLng)) {
+        setStartInput(`Start Point (${urlStartLat.toFixed(3)}, ${urlStartLng.toFixed(3)})`);
+      }
+
+      if (urlStartLat !== null && urlStartLng !== null && !isNaN(urlStartLat) && !isNaN(urlStartLng)) {
+        setStartCoords([urlStartLat, urlStartLng]);
+      }
+
+      if (urlLat !== null && urlLng !== null && !isNaN(urlLat) && !isNaN(urlLng)) {
+        setDestinationCoords([urlLat, urlLng]);
+        setMapCenter([urlLat, urlLng]);
+      }
+    }
+  }, []);
+
+  // Auto-trigger route search if destination URL parameter is provided without pre-solved lat/lng
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlDest = params.get('destination');
+    const urlLat = params.get('lat');
+    if (urlDest && !urlLat && (startInput || hasUserLoc) && !destinationCoords && !routeLoading) {
+      handleRouteSearch();
+    }
+  }, [hasUserLoc, startInput]);
+
+  const handleShareRoute = async () => {
+    if (!routeInfo || !destInput) return;
+
+    const safetyStatus = routeInfo.unsafe
+      ? '⚠️ Proceed with Caution (Hazard Detected)'
+      : routeInfo.warningMsg?.includes('CAUTION')
+      ? '⚠️ Caution Advised'
+      : '✅ Safe Route (No Active Flood Hazards)';
+
+    const destCoordsStr = destinationCoords
+      ? `${destinationCoords[0].toFixed(4)}, ${destinationCoords[1].toFixed(4)}`
+      : '';
+
+    // Primary Link: Direct deep-link to our NOVA Flood app Live Map page
+    const origin = window.location.origin;
+    const currentPath = window.location.pathname === '/' ? '/live-map' : window.location.pathname;
+
+    const queryParts = [`destination=${encodeURIComponent(destInput)}`];
+    if (destinationCoords) {
+      queryParts.push(`lat=${destinationCoords[0]}`);
+      queryParts.push(`lng=${destinationCoords[1]}`);
+    }
+    if (startCoords) {
+      queryParts.push(`startLat=${startCoords[0]}`);
+      queryParts.push(`startLng=${startCoords[1]}`);
+    }
+    if (startInput && !startInput.includes('Location')) {
+      queryParts.push(`start=${encodeURIComponent(startInput)}`);
+    }
+
+    const appRouteUrl = `${origin}${currentPath}?${queryParts.join('&')}`;
+
+    // Secondary Link: Google Maps pin fallback
+    const googleMapsUrl = destinationCoords
+      ? `https://maps.google.com/?q=${destinationCoords[0]},${destinationCoords[1]}`
+      : `https://maps.google.com/?q=${encodeURIComponent(destInput)}`;
+
+    const shareText = `🗺️ *Safe Route Details (NOVA Flood Squad)*\n` +
+      `📍 *Destination:* ${destInput}${destCoordsStr ? ` (${destCoordsStr})` : ''}\n` +
+      `🛡️ *Safety Status:* ${safetyStatus}\n` +
+      `📏 *Distance:* ${routeInfo.distance}\n` +
+      `⏱️ *Est. Time:* ${routeInfo.time}\n\n` +
+      `📲 *Interactive App Safe Route:* ${appRouteUrl}\n\n` +
+      `📍 *Google Maps Pin:* ${googleMapsUrl}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Safe Route to ${destInput}`,
+          text: shareText,
+          url: appRouteUrl
+        });
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2500);
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return; // User closed share dialog
+        console.warn("navigator.share failed, falling back to clipboard copy:", err);
+      }
+    }
+
+    // Fallback: Copy share text summary to clipboard
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareText);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = shareText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy route details to clipboard:", err);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2416,10 +2461,38 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
                 }}>
                   {routeInfo.warningMsg || (routeInfo.unsafe ? '⚠️ WARNING: No safer alternative found — proceed with caution.' : '✅ Safe Route: No active flood hazards detected.')}
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
                   <span>Distance: <strong>{routeInfo.distance}</strong></span>
                   <span>Time: <strong>{routeInfo.time}</strong></span>
                 </div>
+
+                <button
+                  onClick={handleShareRoute}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: shareCopied ? 'rgba(0, 230, 118, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    border: `1px solid ${shareCopied ? '#00e676' : 'rgba(255, 255, 255, 0.2)'}`,
+                    color: shareCopied ? '#00e676' : 'var(--text-bright)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    outline: 'none'
+                  }}
+                  title="Share route summary via device apps or copy to clipboard"
+                >
+                  {shareCopied ? (
+                    <>✓ {t.copied || 'Copied!'}</>
+                  ) : (
+                    <>📲 {t.shareRoute || 'Share Route'}</>
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -2462,10 +2535,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
 // ANALYTICS & SIMULATOR DASHBOARD VIEW
 // ==========================================
 
-function DashboardView({ backendHealthy, userRole, t = translations.en }) {
-  // Theme switcher state (Dark Space default, Light Mode, Ocean Blue)
-  const [dashboardTheme, setDashboardTheme] = useState(() => localStorage.getItem('dashboardTheme') || 'dark');
-
+function DashboardView({ backendHealthy, userRole, appTheme, onThemeChange, t = translations.en }) {
   // Dashboard active tab state ('telemetry' | 'simulator' | 'user-management')
   const [activeTab, setActiveTab] = useState('telemetry');
 
@@ -2861,7 +2931,7 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
   const waveYCoord = baseWaterLevelHeight - (percentageFilled * baseWaterLevelHeight / 100);
 
   return (
-    <div className={`dashboard-container dashboard-theme-${dashboardTheme}`} style={{ transition: 'all 0.3s ease' }}>
+    <div className={`dashboard-container dashboard-theme-${appTheme}`} style={{ transition: 'all 0.3s ease' }}>
       {/* Top Header Controls Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div>
@@ -2885,26 +2955,6 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
             Real-time basin hydrology telemetry, AI predictive risk modeling, and authority operations feed.
           </p>
-        </div>
-
-        {/* Theme Switcher Header Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12.5px', fontWeight: 'bold', opacity: 0.85 }}>{t.dashboardThemeLabel || '🎨 Theme:'}</span>
-          <select 
-            value={dashboardTheme} 
-            onChange={(e) => {
-              const selected = e.target.value;
-              setDashboardTheme(selected);
-              localStorage.setItem('dashboardTheme', selected);
-            }}
-            className="theme-switcher-dropdown"
-            title="Select Dashboard Theme"
-            aria-label="Select Dashboard Theme"
-          >
-            <option value="dark">{t.themeDark || '🌙 Dark Space'}</option>
-            <option value="light">{t.themeLight || '☀️ Light Mode'}</option>
-            <option value="ocean">{t.themeOcean || '🌊 Ocean Blue'}</option>
-          </select>
         </div>
       </div>
 
