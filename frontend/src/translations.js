@@ -143,6 +143,8 @@ export const translations = {
 
     // Global Footer & Alerts
     emergencyAlertPrefix: "EMERGENCY ALERT: Critical risk detected in",
+    offlineMessage: "You're offline. Some features may not update in real-time.",
+    backOnlineMessage: "Back online — connection restored.",
     footerText: "Flood Pulse AI • Hydrographic Forecasting and Pulse Analysis Platform • Powered by Flask & React Vite"
   },
 
@@ -282,6 +284,8 @@ export const translations = {
     creatingAccountBtn: "खाता बनाया जा रहा है...",
     alreadyHaveAccount: "क्या आपके पास पहले से एक खाता मौजूद है?",
     emergencyAlertPrefix: "आपातकालीन चेतावनी: गंभीर जोखिम पाया गया",
+    offlineMessage: "आप ऑफ़लाइन हैं। कुछ सुविधाएं रीयल-टाइम में अपडेट नहीं हो सकती हैं।",
+    backOnlineMessage: "ऑनलाइन वापस आ गए — कनेक्शन बहाल हो गया।",
     footerText: "फ्लड पल्स AI • हाइड्रोग्राफिक पूर्वानुमान और पल्स विश्लेषण मंच"
   },
 
@@ -421,6 +425,8 @@ export const translations = {
     creatingAccountBtn: "ಖಾತೆ ಸೃಷ್ಟಿಸಲಾಗುತ್ತಿದೆ...",
     alreadyHaveAccount: "ಈಗಾಗಲೇ ಖಾತೆ ಹೊಂದಿದ್ದೀರಾ?",
     emergencyAlertPrefix: "ತುರ್ತು ಎಚ್ಚರಿಕೆ: ತೀವ್ರ ಅಪಾಯ ಪತ್ತೆಯಾಗಿದೆ",
+    offlineMessage: "ನೀವು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿದ್ದೀರಿ. ಕೆಲವು ವೈಶಿಷ್ಟ್ಯಗಳು ನೈಜ ಸಮಯದಲ್ಲಿ ನವೀಕರಣಗೊಳ್ಳದಿರಬಹುದು.",
+    backOnlineMessage: "ಮತ್ತೆ ಆನ್‌ಲೈನ್‌ಗೆ ಬಂದಿದ್ದೀರಿ — ಸಂಪರ್ಕ ಮರುಸ್ಥಾಪಿಸಲಾಗಿದೆ.",
     footerText: "ಫ್ಲಡ್ ಪಲ್ಸ್ AI • ಜಲವಿಜ್ಞಾನ ಮುನ್ಸೂಚನೆ ಮತ್ತು ವಿಶ್ಲೇಷಣಾ ವೇದಿಕೆ"
   },
 

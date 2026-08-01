@@ -394,6 +394,39 @@ function App() {
   const [dismissedAlertId, setDismissedAlertId] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
 
+  // Network Connectivity Tracking States (detect offline loss & connection restoration)
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [wasOffline, setWasOffline] = useState(false);
+  const [showBackOnline, setShowBackOnline] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (wasOffline) {
+        setShowBackOnline(true);
+        const timer = setTimeout(() => {
+          setShowBackOnline(false);
+          setWasOffline(false);
+        }, 3500);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      setWasOffline(true);
+      setShowBackOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [wasOffline]);
+
   // Poll backend health status
   const checkBackendHealth = async () => {
     try {
@@ -634,6 +667,50 @@ function App() {
           onThemeChange={handleThemeChange}
           t={t}
         />
+
+        {/* Connectivity Status Fallback Banner (Offline Warning / Restoration Alert) */}
+        {!isOnline && (
+          <div className="connectivity-banner offline" style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.98))',
+            color: '#ffffff',
+            padding: '10px 16px',
+            textAlign: 'center',
+            fontSize: '13px',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
+            zIndex: 9999,
+            position: 'relative'
+          }}>
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{t.offlineMessage || "You're offline. Some features may not update in real-time."}</span>
+          </div>
+        )}
+
+        {isOnline && showBackOnline && (
+          <div className="connectivity-banner online" style={{
+            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.98))',
+            color: '#ffffff',
+            padding: '10px 16px',
+            textAlign: 'center',
+            fontSize: '13px',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.35)',
+            zIndex: 9999,
+            position: 'relative',
+            transition: 'all 0.3s ease'
+          }}>
+            <span style={{ fontSize: '16px' }}>🟢</span>
+            <span>{t.backOnlineMessage || 'Back online — connection restored.'}</span>
+          </div>
+        )}
 
         {/* Global Emergency Alert Banner */}
         {showBanner && activeAlert && (
