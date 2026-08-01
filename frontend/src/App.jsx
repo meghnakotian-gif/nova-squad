@@ -531,7 +531,7 @@ function App() {
 
       {/* Routed Pages Area */}
       <Routes>
-        <Route path="/" element={<HomeView />} />
+        <Route path="/" element={<HomeView t={t} />} />
         <Route path="/live-map" element={
           <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
             <LiveMapView t={t} />
@@ -539,22 +539,22 @@ function App() {
         } />
         <Route path="/report" element={
           <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
-            <ReportFloodView />
+            <ReportFloodView t={t} />
           </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
           <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
-            <DashboardView backendHealthy={backendHealthy} />
+            <DashboardView backendHealthy={backendHealthy} t={t} />
           </ProtectedRoute>
         } />
-        <Route path="/login" element={<LoginView />} />
-        <Route path="/signup" element={<SignupView />} />
+        <Route path="/login" element={<LoginView t={t} />} />
+        <Route path="/signup" element={<SignupView t={t} />} />
       </Routes>
 
       {/* Global Footer */}
       <footer className="app-footer">
         <p>
-          Flood Pulse AI • Hydrographic Forecasting and Pulse Analysis Platform • Powered by Flask & React Vite
+          {t.footerText || 'Flood Pulse AI • Hydrographic Forecasting and Pulse Analysis Platform • Powered by Flask & React Vite'}
         </p>
       </footer>
 
@@ -563,36 +563,36 @@ function App() {
         <nav className="mobile-navbar">
           <NavLink to="/" end className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
             <span className="mobile-nav-icon">🏠</span>
-            <span>Home</span>
+            <span>{t.home || 'Home'}</span>
           </NavLink>
           {currentUser ? (
             <>
               <NavLink to="/live-map" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span className="mobile-nav-icon">🗺️</span>
-                <span>Live Map</span>
+                <span>{t.liveMap || 'Live Map'}</span>
               </NavLink>
               <NavLink to="/report" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span className="mobile-nav-icon">📝</span>
-                <span>Report</span>
+                <span>{t.reportFlood || 'Report'}</span>
               </NavLink>
               <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span className="mobile-nav-icon">📊</span>
-                <span>Dashboard</span>
+                <span>{t.dashboard || 'Dashboard'}</span>
               </NavLink>
-              <Link to="/login" onClick={() => signOut(auth)} className="mobile-nav-item">
+              <Link to="/" onClick={() => signOut(auth)} className="mobile-nav-item">
                 <span className="mobile-nav-icon">🔓</span>
-                <span>Logout</span>
+                <span>{t.logout || 'Logout'}</span>
               </Link>
             </>
           ) : (
             <>
               <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span className="mobile-nav-icon">👤</span>
-                <span>Login</span>
+                <span>{t.login || 'Login'}</span>
               </NavLink>
               <NavLink to="/signup" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span className="mobile-nav-icon">📝</span>
-                <span>Signup</span>
+                <span>{t.signup || 'Signup'}</span>
               </NavLink>
             </>
           )}
@@ -606,7 +606,7 @@ function App() {
 // LOGIN VIEW (Firebase Email/Password Auth)
 // ==========================================
 
-function LoginView() {
+function LoginView({ t = translations.en }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -637,8 +637,8 @@ function LoginView() {
   return (
     <div className="auth-layout panel pulsing-glow">
       <div className="auth-header">
-        <h2>Welcome Back</h2>
-        <p>Log in to access your forecasting settings and telemetry database.</p>
+        <h2>{t.welcomeBack || 'Welcome Back'}</h2>
+        <p>{t.loginSubtitle || 'Log in to access your forecasting settings and telemetry database.'}</p>
         {error && (
           <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
             ⚠️ {error}
@@ -648,7 +648,7 @@ function LoginView() {
 
       <form onSubmit={handleLogin}>
         <div className="form-group">
-          <label className="form-label" htmlFor="login_email">Email Address</label>
+          <label className="form-label" htmlFor="login_email">{t.emailAddressLabel || 'Email Address'}</label>
           <input 
             type="email" 
             id="login_email" 
@@ -662,7 +662,7 @@ function LoginView() {
         </div>
 
         <div className="form-group">
-          <label className="form-label" htmlFor="login_password">Password</label>
+          <label className="form-label" htmlFor="login_password">{t.passwordLabel || 'Password'}</label>
           <input 
             type="password" 
             id="login_password" 
@@ -681,12 +681,12 @@ function LoginView() {
           style={{ width: '100%', marginTop: '8px' }} 
           disabled={loading}
         >
-          {loading ? 'Signing In...' : 'Sign In'}
+          {loading ? (t.signingInBtn || 'Signing In...') : (t.signInBtn || 'Sign In')}
         </button>
       </form>
 
       <div className="auth-footer">
-        Don't have an account? <Link to="/signup">Sign Up</Link>
+        {t.dontHaveAccount || "Don't have an account?"} <Link to="/signup">{t.signup || 'Sign Up'}</Link>
       </div>
     </div>
   );
@@ -696,7 +696,7 @@ function LoginView() {
 // SIGNUP VIEW (Firebase Register + Firestore user record)
 // ==========================================
 
-function SignupView() {
+function SignupView({ t = translations.en }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -750,8 +750,8 @@ function SignupView() {
   return (
     <div className="auth-layout panel pulsing-glow">
       <div className="auth-header">
-        <h2>Create Account</h2>
-        <p>Register to participate in forecasting and flood sighting reports.</p>
+        <h2>{t.createAccountTitle || 'Create Account'}</h2>
+        <p>{t.signupSubtitle || 'Register to participate in forecasting and flood sighting reports.'}</p>
         {error && (
           <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
             ⚠️ {error}
@@ -761,7 +761,7 @@ function SignupView() {
 
       <form onSubmit={handleSignup}>
         <div className="form-group">
-          <label className="form-label" htmlFor="signup_email">Email Address</label>
+          <label className="form-label" htmlFor="signup_email">{t.emailAddressLabel || 'Email Address'}</label>
           <input 
             type="email" 
             id="signup_email" 
@@ -775,7 +775,7 @@ function SignupView() {
         </div>
 
         <div className="form-group">
-          <label className="form-label" htmlFor="signup_password">Password (min 6 chars)</label>
+          <label className="form-label" htmlFor="signup_password">{t.passwordLabel || 'Password'}</label>
           <input 
             type="password" 
             id="signup_password" 
@@ -789,7 +789,7 @@ function SignupView() {
         </div>
 
         <div className="form-group">
-          <label className="form-label" htmlFor="signup_confirm_password">Confirm Password</label>
+          <label className="form-label" htmlFor="signup_confirm_password">{t.confirmPasswordLabel || 'Confirm Password'}</label>
           <input 
             type="password" 
             id="signup_confirm_password" 
@@ -808,12 +808,12 @@ function SignupView() {
           style={{ width: '100%', marginTop: '8px' }} 
           disabled={loading}
         >
-          {loading ? 'Creating Account...' : 'Sign Up'}
+          {loading ? (t.creatingAccountBtn || 'Creating Account...') : (t.signUpBtn || 'Sign Up')}
         </button>
       </form>
 
       <div className="auth-footer">
-        Already have an account? <Link to="/login">Log In</Link>
+        {t.alreadyHaveAccount || 'Already have an account?'} <Link to="/login">{t.login || 'Log In'}</Link>
       </div>
     </div>
   );
@@ -823,21 +823,21 @@ function SignupView() {
 // HOME VIEW (Introductory Landing Layout)
 // ==========================================
 
-function HomeView() {
+function HomeView({ t = translations.en }) {
   return (
     <div className="home-layout">
       {/* Banner / Hero Section */}
       <section className="home-hero pulsing-glow">
-        <h2 className="home-title">Predicting river pulses, protecting basin communities</h2>
+        <h2 className="home-title">{t.homeHeroTitle || 'Predicting river pulses, protecting basin communities'}</h2>
         <p className="home-subtitle">
-          Flood Pulse AI is a hydrology forecasting platform utilizing mock predictive neural engines to monitor river swelling patterns, upstream water discharges, and soil moisture levels. Assess risks and plan ahead.
+          {t.homeHeroSubtitle || 'Flood Pulse AI is a hydrology forecasting platform utilizing mock predictive neural engines to monitor river swelling patterns, upstream water discharges, and soil moisture levels. Assess risks and plan ahead.'}
         </p>
         <div style={{ display: 'flex', gap: '12px' }}>
           <Link to="/dashboard" className="btn btn-primary">
-            🚀 Open Analytics Dashboard
+            {t.openAnalyticsDashboard || '🚀 Open Analytics Dashboard'}
           </Link>
           <Link to="/live-map" className="btn btn-secondary">
-            🗺️ View Flood Map
+            {t.viewFloodMap || '🗺️ View Flood Map'}
           </Link>
         </div>
       </section>
@@ -846,23 +846,23 @@ function HomeView() {
       <section className="info-grid">
         <div className="info-card">
           <span className="card-icon">📡</span>
-          <h3 className="card-title">Hydrological Monitoring</h3>
+          <h3 className="card-title">{t.card1Title || 'Hydrological Monitoring'}</h3>
           <p className="card-desc">
-            Aggregates live sensor telemetry including real-time water levels, discharge volumes, precipitation depth, and land saturation levels.
+            {t.card1Desc || 'Aggregates live sensor telemetry including real-time water levels, discharge volumes, precipitation depth, and land saturation levels.'}
           </p>
         </div>
         <div className="info-card">
           <span className="card-icon">🧠</span>
-          <h3 className="card-title">AI Predictive Simulator</h3>
+          <h3 className="card-title">{t.card2Title || 'AI Predictive Simulator'}</h3>
           <p className="card-desc">
-            Run custom models adjusting upstream release and humidity variables. Get risk calculations and inundation forecasts.
+            {t.card2Desc || 'Run custom models adjusting upstream release and humidity variables. Get risk calculations and inundation forecasts.'}
           </p>
         </div>
         <div className="info-card">
           <span className="card-icon">📣</span>
-          <h3 className="card-title">Incident Crowdsourcing</h3>
+          <h3 className="card-title">{t.card3Title || 'Incident Crowdsourcing'}</h3>
           <p className="card-desc">
-            Enables regional emergency contacts and local citizens to report flood sightings to calibrate automated risk maps.
+            {t.card3Desc || 'Enables regional emergency contacts and local citizens to report flood sightings to calibrate automated risk maps.'}
           </p>
         </div>
       </section>
@@ -874,7 +874,7 @@ function HomeView() {
 // REPORT FLOOD VIEW (Sightings Form Layout)
 // ==========================================
 
-function ReportFloodView() {
+function ReportFloodView({ t = translations.en }) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -1000,8 +1000,8 @@ const uploadToImgBB = (file, onProgress) => {
   return (
     <div className="report-layout panel pulsing-glow">
       <div className="form-header">
-        <h2>Report Local Incident</h2>
-        <p>Help refine our hydrological forecasts by submitting live sightings of flooding or high water conditions.</p>
+        <h2>{t.reportLocalIncident || 'Report Local Incident'}</h2>
+        <p>{t.reportSubtitle || 'Help refine our hydrological forecasts by submitting live sightings of flooding or high water conditions.'}</p>
         {error && (
           <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
             ⚠️ {error}
@@ -1012,23 +1012,23 @@ const uploadToImgBB = (file, onProgress) => {
       {submitted ? (
         <div style={{ textAlign: 'center', padding: '32px 0' }}>
           <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>✅</span>
-          <h3 style={{ color: 'var(--text-bright)' }}>Report Logged</h3>
+          <h3 style={{ color: 'var(--text-bright)' }}>{t.reportLogged || 'Report Logged'}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
-            Thank you. Your sighting details have been queued for processing.
+            {t.reportThankYou || 'Thank you. Your sighting details have been queued for processing.'}
           </p>
           <button className="btn btn-secondary" onClick={() => setSubmitted(false)}>
-            Submit Another Report
+            {t.submitAnotherReport || 'Submit Another Report'}
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="location">Incident Location / Area</label>
+            <label className="form-label" htmlFor="location">{t.incidentLocation || 'Incident Location / Area'}</label>
             <input 
               type="text" 
               id="location" 
               className="form-input" 
-              placeholder="e.g. Rio Negro Bridge Crossing (KM 12)" 
+              placeholder={t.locationPlaceholder || 'e.g. Rio Negro Bridge Crossing (KM 12)'}
               value={formData.location}
               onChange={handleChange}
               required 
@@ -1037,7 +1037,7 @@ const uploadToImgBB = (file, onProgress) => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="severity">Visual Water Level Severity</label>
+            <label className="form-label" htmlFor="severity">{t.visualSeverity || 'Visual Water Level Severity'}</label>
             <select 
               id="severity" 
               className="form-select" 
@@ -1046,16 +1046,16 @@ const uploadToImgBB = (file, onProgress) => {
               required
               disabled={submitting}
             >
-              <option value="">Choose Severity Option...</option>
-              <option value="normal">Normal Baseline (Safe)</option>
-              <option value="elevated">Elevated (Flooded Banks)</option>
-              <option value="severe">Severe (Inundation of Fields/Roadways)</option>
-              <option value="critical">Critical (Levee Overtopping/Evacuating)</option>
+              <option value="">{t.chooseSeverity || 'Choose Severity Option...'}</option>
+              <option value="normal">{t.normalBaseline || 'Normal Baseline (Safe)'}</option>
+              <option value="elevated">{t.elevatedSeverity || 'Elevated (Flooded Banks)'}</option>
+              <option value="severe">{t.severeSeverity || 'Severe (Inundation of Fields/Roadways)'}</option>
+              <option value="critical">{t.criticalSeverity || 'Critical (Levee Overtopping/Evacuating)'}</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="email">Reporter Contact Email</label>
+            <label className="form-label" htmlFor="email">{t.reporterEmail || 'Reporter Contact Email'}</label>
             <input 
               type="email" 
               id="email" 
@@ -1069,11 +1069,11 @@ const uploadToImgBB = (file, onProgress) => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="details">Observations & Observations Details</label>
+            <label className="form-label" htmlFor="details">{t.observationsLabel || 'Observations & Details'}</label>
             <textarea 
               id="details" 
               className="form-textarea" 
-              placeholder="Provide a brief description of river state, blockages, or structures affected..."
+              placeholder={t.observationsPlaceholder || 'Provide a brief description of river state, blockages, or structures affected...'}
               value={formData.details}
               onChange={handleChange}
               disabled={submitting}
@@ -1081,7 +1081,7 @@ const uploadToImgBB = (file, onProgress) => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="photo">Sighting Documentation (Photos / Video)</label>
+            <label className="form-label" htmlFor="photo">{t.sightingDoc || 'Sighting Documentation (Photos / Video)'}</label>
             <div className="upload-zone" style={{ opacity: submitting ? 0.6 : 1, position: 'relative', cursor: 'pointer' }}>
               <input 
                 type="file" 
@@ -1110,7 +1110,7 @@ const uploadToImgBB = (file, onProgress) => {
                   </span>
                 </div>
               ) : (
-                <span className="upload-text">Click or drag media files here to attach photo to incident log</span>
+                <span className="upload-text">{t.clickOrDragUpload || 'Click or drag media files here to attach photo to incident log'}</span>
               )}
             </div>
 
@@ -1868,7 +1868,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
 // ANALYTICS & SIMULATOR DASHBOARD VIEW
 // ==========================================
 
-function DashboardView({ backendHealthy }) {
+function DashboardView({ backendHealthy, t = translations.en }) {
   // Theme switcher state (Dark Space default, Light Mode, Ocean Blue)
   const [dashboardTheme, setDashboardTheme] = useState(() => localStorage.getItem('dashboardTheme') || 'dark');
 
@@ -2155,7 +2155,7 @@ function DashboardView({ backendHealthy }) {
     <div className={`dashboard-container dashboard-theme-${dashboardTheme}`} style={{ transition: 'all 0.3s ease' }}>
       {/* Theme Switcher Header Controls */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <span style={{ fontSize: '12.5px', fontWeight: 'bold', opacity: 0.85 }}>🎨 Dashboard Theme:</span>
+        <span style={{ fontSize: '12.5px', fontWeight: 'bold', opacity: 0.85 }}>{t.dashboardThemeLabel || '🎨 Dashboard Theme:'}</span>
         <select 
           value={dashboardTheme} 
           onChange={(e) => {
@@ -2167,9 +2167,9 @@ function DashboardView({ backendHealthy }) {
           title="Select Dashboard Theme"
           aria-label="Select Dashboard Theme"
         >
-          <option value="dark">🌙 Dark Space (Default)</option>
-          <option value="light">☀️ Light Mode</option>
-          <option value="ocean">🌊 Ocean Blue</option>
+          <option value="dark">{t.themeDark || '🌙 Dark Space (Default)'}</option>
+          <option value="light">{t.themeLight || '☀️ Light Mode'}</option>
+          <option value="ocean">{t.themeOcean || '🌊 Ocean Blue'}</option>
         </select>
       </div>
 
@@ -2177,31 +2177,31 @@ function DashboardView({ backendHealthy }) {
         {/* Left Side: Sensor Telemetry Widget */}
         <section className="panel pulsing-glow">
           <div className="panel-header">
-            <h2 className="panel-title">📡 Real-Time Hydrology Telemetry</h2>
+            <h2 className="panel-title">{t.realTimeHydrology || '📡 Real-Time Hydrology Telemetry'}</h2>
             <button 
               className="btn btn-secondary" 
               onClick={fetchTelemetry}
               disabled={loadingTelemetry}
             >
-              {loadingTelemetry ? 'Refreshing Sensors...' : '🔄 Poll Sensors'}
+              {loadingTelemetry ? (t.refreshingSensors || 'Refreshing Sensors...') : (t.pollSensors || '🔄 Poll Sensors')}
             </button>
           </div>
 
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
-            Telemetry readings from <strong>{telemetry.station}</strong>.
+            {t.telemetryReadingsFrom || 'Telemetry readings from'} <strong>{telemetry.station}</strong>.
           </p>
 
           {/* Telemetry Gauge Cards */}
           <div className="telemetry-grid">
             <div className="telemetry-card">
-              <div className="card-label">Water Level</div>
+              <div className="card-label">{t.waterLevel || 'Water Level'}</div>
               <div className="card-value">
                 {telemetry.water_level_m} <span className="card-unit">m</span>
               </div>
             </div>
 
             <div className="telemetry-card">
-              <div className="card-label">River Discharge</div>
+              <div className="card-label">{t.riverDischarge || 'River Discharge'}</div>
               <div className="card-value">
                 {telemetry.flow_rate_m3s} <span className="card-unit">m³/s</span>
               </div>
@@ -2209,7 +2209,7 @@ function DashboardView({ backendHealthy }) {
 
             <div className="telemetry-card" style={{ position: 'relative' }}>
               <div className="card-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Precipitation / Weather</span>
+                <span>{t.precipitationWeather || 'Precipitation / Weather'}</span>
                 {liveWeather.isLive && (
                   <span className="live-badge" style={{
                     fontSize: '9px',
@@ -2246,7 +2246,7 @@ function DashboardView({ backendHealthy }) {
             </div>
 
             <div className="telemetry-card">
-              <div className="card-label">Soil Moisture</div>
+              <div className="card-label">{t.soilMoisture || 'Soil Moisture'}</div>
               <div className="card-value">
                 {telemetry.soil_moisture_pct} <span className="card-unit">%</span>
               </div>
@@ -2290,22 +2290,22 @@ function DashboardView({ backendHealthy }) {
               {telemetry.alert_status}
             </span>
             <div className="alert-message">
-              <strong>System Status:</strong> {telemetry.alert_desc}
+              <strong>{t.systemStatus || 'System Status:'}</strong> {telemetry.alert_desc}
             </div>
           </div>
         </section>
 
         {/* Right Side: AI Flood Risk Simulator */}
         <section className="panel">
-        <h2 className="panel-title" style={{ marginBottom: '8px' }}>🧠 AI Prediction Simulator</h2>
+        <h2 className="panel-title" style={{ marginBottom: '8px' }}>{t.aiPredictionSimulator || '🧠 AI Prediction Simulator'}</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
-          Simulate flood risk by invoking the AI predictive models.
+          {t.simulatorSubtitle || 'Simulate flood risk by invoking the AI predictive models.'}
         </p>
 
         {/* Form Controls */}
         <form onSubmit={runPredictionSimulation}>
           <div className="form-group">
-            <label className="form-label" htmlFor="sim_zone_name">Target Zone Name</label>
+            <label className="form-label" htmlFor="sim_zone_name">{t.targetZoneName || 'Target Zone Name'}</label>
             <input 
               type="text" 
               id="sim_zone_name" 
@@ -2319,7 +2319,7 @@ function DashboardView({ backendHealthy }) {
 
           <div className="control-group">
             <div className="control-label-row">
-              <span>Rainfall Level</span>
+              <span>{t.rainfallLevel || 'Rainfall Level'}</span>
               <span className="control-val">{simInputs.rainfall_mm} mm</span>
             </div>
             <input 
@@ -2336,7 +2336,7 @@ function DashboardView({ backendHealthy }) {
 
           <div className="control-group">
             <div className="control-label-row">
-              <span>Water Level Baseline</span>
+              <span>{t.waterLevelBaseline || 'Water Level Baseline'}</span>
               <span className="control-val">{simInputs.water_level_m} m</span>
             </div>
             <input 
@@ -2357,7 +2357,7 @@ function DashboardView({ backendHealthy }) {
             style={{ width: '100%', marginTop: '8px' }} 
             disabled={runningSim}
           >
-            {runningSim ? 'Running AI Model...' : '🧠 Run Prediction'}
+            {runningSim ? (t.runningPredictionBtn || 'Running AI Model...') : (t.runPredictionBtn || '🧠 Run Prediction')}
           </button>
         </form>
 
@@ -2366,18 +2366,18 @@ function DashboardView({ backendHealthy }) {
           <div className="prediction-output-card" style={{ marginTop: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Prediction Result
+                {t.predictionResult || 'Prediction Result'}
               </span>
               {firestoreSaved && (
                 <span style={{ fontSize: '11px', color: 'var(--color-success)', fontWeight: '600' }}>
-                  ✓ Saved to Firestore
+                  {t.savedToFirestore || '✓ Saved to Firestore'}
                 </span>
               )}
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '16px' }}>
               <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Forecast for <strong>{simOutput.zone_name}</strong>
+                {t.forecastFor || 'Forecast for'} <strong>{simOutput.zone_name}</strong>
               </div>
               <span className={`alert-indicator ${simOutput.risk}`} style={{ fontSize: '18px', padding: '10px 24px', borderRadius: '8px' }}>
                 {simOutput.risk}
@@ -2386,7 +2386,7 @@ function DashboardView({ backendHealthy }) {
 
             <div className="prediction-stats" style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
               <div className="stat-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="stat-label" style={{ margin: 0 }}>Model Confidence</span>
+                <span className="stat-label" style={{ margin: 0 }}>{t.modelConfidence || 'Model Confidence'}</span>
                 <span className="stat-val" style={{ color: 'var(--color-primary)', fontWeight: '700' }}>{simOutput.confidence}%</span>
               </div>
             </div>
