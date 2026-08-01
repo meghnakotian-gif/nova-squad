@@ -1216,6 +1216,19 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
   return null;
 }
 
+// Helper to calculate distance in kilometers between two lat/lng coordinates
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+  return R * c;
+}
+
 function LiveMapView() {
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1232,6 +1245,7 @@ function LiveMapView() {
   const [routeCoords, setRouteCoords] = useState([]);
   const [routeInfo, setRouteInfo] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
 
   const fetchUserLocation = () => {
@@ -1292,33 +1306,84 @@ function LiveMapView() {
   const handleRouteSearch = async () => {
     if (!destInput || !startInput) return;
     setRouteLoading(true);
+    setRouteError('');
+
     try {
-      let resolvedStart = startCoords;
-      if (!startInput.startsWith('My Location')) {
-        const startRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json`);
+      let resolvedStart = startCoords || userLoc;
+      
+      // 1. Geocode Start Location with accept-language=en if not using GPS
+      if (!startInput.startsWith('My Location') || !resolvedStart) {
+        const startRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json&accept-language=en`
+        );
         const startData = await startRes.json();
         if (startData && startData.length > 0) {
-           resolvedStart = [parseFloat(startData[0].lat), parseFloat(startData[0].lon)];
-           setStartCoords(resolvedStart);
+          resolvedStart = [parseFloat(startData[0].lat), parseFloat(startData[0].lon)];
+          setStartCoords(resolvedStart);
         } else {
-           alert("Start location not found.");
-           setRouteLoading(false);
-           return;
+          setRouteError("Location not found — please enter a valid address");
+          setDestinationCoords(null);
+          setRouteInfo(null);
+          setRouteCoords([]);
+          setRouteLoading(false);
+          return;
         }
       }
 
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json`);
+      // 2. Geocode Destination Location with accept-language=en
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en`
+      );
       const data = await res.json();
-      if (data && data.length > 0) {
-        setDestinationCoords([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
-      } else {
-        alert("Destination not found. Please try a different address.");
+
+      if (!data || data.length === 0) {
+        setRouteError("Location not found — please enter a valid address");
+        setDestinationCoords(null);
+        setRouteInfo(null);
+        setRouteCoords([]);
+        setRouteLoading(false);
+        return;
       }
+
+      const destLat = parseFloat(data[0].lat);
+      const destLng = parseFloat(data[0].lon);
+
+      if (isNaN(destLat) || isNaN(destLng)) {
+        setRouteError("Location not found — please enter a valid address");
+        setDestinationCoords(null);
+        setRouteInfo(null);
+        setRouteCoords([]);
+        setRouteLoading(false);
+        return;
+      }
+
+      // 3. Distance Check: Destination must be within 100km of current/start location
+      const baseLoc = resolvedStart || userLoc;
+      if (baseLoc) {
+        const distKm = calculateDistanceKm(baseLoc[0], baseLoc[1], destLat, destLng);
+        if (distKm > 100) {
+          console.warn(`Geocoded destination is ${distKm.toFixed(1)}km away (exceeds 100km limit).`);
+          setRouteError("Location not found — please enter a valid address");
+          setDestinationCoords(null);
+          setRouteInfo(null);
+          setRouteCoords([]);
+          setRouteLoading(false);
+          return;
+        }
+      }
+
+      // Valid destination! Clear errors and draw route
+      setRouteError('');
+      setDestinationCoords([destLat, destLng]);
     } catch (err) {
-      console.error(err);
-      alert("Error finding location via geocoding.");
+      console.error("Route geocoding error: ", err);
+      setRouteError("Location not found — please enter a valid address");
+      setDestinationCoords(null);
+      setRouteInfo(null);
+      setRouteCoords([]);
+    } finally {
+      setRouteLoading(false);
     }
-    setRouteLoading(false);
   };
 
   // Request browser geolocation on mount
@@ -1450,8 +1515,8 @@ function LiveMapView() {
           {/* Leaflet React Map Container */}
           <MapContainer center={userLoc} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
             
             {/* User current location indicator marker */}
@@ -1628,7 +1693,13 @@ function LiveMapView() {
               {routeLoading ? 'Calculating...' : 'Find Safe Route'}
             </button>
             
-            {routeInfo && (
+            {routeError && (
+              <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '4px', background: 'rgba(255, 62, 62, 0.1)', border: '1px solid var(--color-danger)', color: 'var(--color-danger)', fontSize: '13px', fontWeight: 'bold' }}>
+                ⚠️ {routeError}
+              </div>
+            )}
+
+            {routeInfo && !routeError && (
               <div style={{ marginTop: '12px', padding: '12px', borderRadius: '4px', background: routeInfo.unsafe ? 'rgba(255, 62, 62, 0.1)' : 'rgba(40, 167, 69, 0.1)', border: `1px solid ${routeInfo.unsafe ? 'var(--color-danger)' : 'var(--color-success)'}` }}>
                 {routeInfo.unsafe ? (
                   <p style={{ margin: '0 0 8px', color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '13px' }}>
