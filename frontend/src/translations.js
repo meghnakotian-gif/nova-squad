@@ -57,6 +57,11 @@ export const translations = {
     noTelemetryAvailable: "No telemetry points available.",
     shareRoute: "Share Route",
     copied: "Copied!",
+    sosButton: "SOS 1077",
+    callEmergencyServices: "Call Emergency Services (Toll-Free 1077 / 108)",
+    emergencyHeader: "EMERGENCY DISASTER HELPLINE",
+    callDisasterHelpline: "Call 1077 (Disaster)",
+    callAmbulance: "Call 108 (Ambulance)",
 
     // Report Incident View
     reportLocalIncident: "Report Local Incident",
@@ -196,6 +201,11 @@ export const translations = {
     noTelemetryAvailable: "कोई टेलीमेट्री बिंदु उपलब्ध नहीं है।",
     shareRoute: "मार्ग साझा करें",
     copied: "कॉपी हो गया!",
+    sosButton: "SOS 1077",
+    callEmergencyServices: "आपातकालीन सेवाओं को कॉल करें (टोल-फ्री 1077 / 108)",
+    emergencyHeader: "आपातकालीन आपदा हेल्पलाइन",
+    callDisasterHelpline: "1077 कॉल करें (आपदा)",
+    callAmbulance: "108 कॉल करें (एम्बुलेंस)",
 
     reportLocalIncident: "स्थानीय घटना की रिपोर्ट करें",
     reportSubtitle: "जलस्तर या बाढ़ की स्थिति का लाइव विवरण प्रस्तुत करके हमारे पूर्वानुमानों को सटीक बनाएं।",
@@ -330,6 +340,11 @@ export const translations = {
     noTelemetryAvailable: "ಯಾವುದೇ ಟೆಲಿಮೆಟ್ರಿ ಪಾಯಿಂಟ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
     shareRoute: "ಮಾರ್ಗವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ",
     copied: "ನಕಲಿಸಲಾಗಿದೆ!",
+    sosButton: "SOS 1077",
+    callEmergencyServices: "ತುರ್ತು સેવાಗೆ ಕರೆ ಮಾಡಿ (ಉಚಿತ 1077 / 108)",
+    emergencyHeader: "ತುರ್ತು ಆಪತ್ತು ਹੈਲಪ್‌ಲೈನ್",
+    callDisasterHelpline: "1077 ಗೆ ಕರೆ ಮಾಡಿ (ಆಪತ್ತು)",
+    callAmbulance: "108 ಗೆ ಕರೆ ಮಾಡಿ (ಆಂಬ್ಯುಲೆನ್ಸ್)",
 
     reportLocalIncident: "ಸ್ಥಳೀಯ ಘಟನೆ ವರದಿ ಮಾಡಿ",
     reportSubtitle: "ನಿಮ್ಮ ಪ್ರದೇಶದಲ್ಲಿ ನೀರಿನ ಮಟ್ಟ ಹೆಚ್ಚಾಗಿದ್ದರೆ ನಮಗೆ ವರದಿ ಮಾಡಿ ಸಹಾಯ ಮಾಡಿ.",

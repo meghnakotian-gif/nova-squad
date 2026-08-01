@@ -163,6 +163,34 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
               </select>
             </li>
 
+            {/* SOS Emergency Helpline Button (visible on all pages) */}
+            <li className="nav-item">
+              <a 
+                href="tel:1077"
+                className="sos-navbar-btn"
+                title="Call Disaster Management Helpline (1077)"
+                aria-label="Call Disaster Management Helpline (1077)"
+                style={{
+                  background: 'linear-gradient(135deg, #ff3e3e, #ff5722)',
+                  color: '#ffffff',
+                  padding: '5px 13px',
+                  borderRadius: '20px',
+                  fontWeight: '800',
+                  fontSize: '12px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 0 14px rgba(255, 62, 62, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  letterSpacing: '0.3px',
+                  cursor: 'pointer'
+                }}
+              >
+                🆘 {t.sosButton || 'SOS 1077'}
+              </a>
+            </li>
+
             <li className="nav-item">
               <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 {t.home || 'Home'}
@@ -2218,6 +2246,79 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
 
   return (
     <div className={`map-view-grid ${isFullscreen ? 'fullscreen-map-mode' : ''}`}>
+      {/* SOS / Emergency Responders Quick Call Banner */}
+      <div className="sos-emergency-banner" style={{
+        gridColumn: '1 / -1',
+        background: 'linear-gradient(135deg, rgba(255, 62, 62, 0.22), rgba(255, 87, 34, 0.22))',
+        border: '2px solid #ff3e3e',
+        borderRadius: '14px',
+        padding: '16px 20px',
+        marginBottom: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '16px',
+        boxShadow: '0 0 24px rgba(255, 62, 62, 0.25)',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <span style={{ fontSize: '32px', filter: 'drop-shadow(0 0 8px #ff3e3e)' }}>🆘</span>
+          <div>
+            <div style={{ fontWeight: '800', fontSize: '15.5px', color: '#ff5252', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+              {t.emergencyHeader || 'EMERGENCY DISASTER HELPLINE'}
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-bright)', marginTop: '2px', opacity: 0.9 }}>
+              {t.callEmergencyServices || 'Call Emergency Services (Toll-Free 1077 / 108)'}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <a
+            href="tel:1077"
+            style={{
+              background: 'linear-gradient(135deg, #ff3e3e, #d50000)',
+              color: '#ffffff',
+              padding: '10px 20px',
+              borderRadius: '24px',
+              fontWeight: '800',
+              fontSize: '13.5px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 16px rgba(255, 62, 62, 0.45)',
+              border: '1px solid #ff5252',
+              transition: 'transform 0.2s ease'
+            }}
+            title="Call 1077 Disaster Management Helpline"
+          >
+            📞 {t.callDisasterHelpline || 'Call 1077 (Disaster)'}
+          </a>
+
+          <a
+            href="tel:108"
+            style={{
+              background: 'linear-gradient(135deg, #ff5722, #e65100)',
+              color: '#ffffff',
+              padding: '10px 20px',
+              borderRadius: '24px',
+              fontWeight: '800',
+              fontSize: '13.5px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 16px rgba(255, 87, 34, 0.45)',
+              border: '1px solid #ff8a65',
+              transition: 'transform 0.2s ease'
+            }}
+            title="Call 108 Emergency Ambulance"
+          >
+            🚑 {t.callAmbulance || 'Call 108 (Ambulance)'}
+          </a>
+        </div>
+      </div>
       {/* Map Interactive Canvas */}
       <section className="panel map-card" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="map-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
