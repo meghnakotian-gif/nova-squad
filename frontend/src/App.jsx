@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
 
@@ -32,11 +32,37 @@ import {
 const BACKEND_URL = 'https://nova-squad-backend.onrender.com';
 
 // ==========================================
+// Helper function to format relative timestamps ("2 minutes ago", "Just now", etc.)
+function getTimeAgo(timestamp, timeRaw) {
+  let ms = Date.now();
+  if (timestamp?.toMillis) {
+    ms = timestamp.toMillis();
+  } else if (timestamp?.seconds) {
+    ms = timestamp.seconds * 1000;
+  } else if (timeRaw) {
+    ms = timeRaw;
+  }
+  
+  const diffSecs = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (diffSecs < 60) return 'Just now';
+  const diffMins = Math.floor(diffSecs / 60);
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+}
+
+// ==========================================
 // ROOT COMPONENT WITH ROUTER
 // ==========================================
 
-function HeaderNavbar({ backendHealthy, currentUser, authLoading }) {
+function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead }) {
   const navigate = useNavigate();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
 
   const handleLogout = async () => {
     try {
@@ -47,6 +73,17 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading }) {
       console.error("Sign out process failed: ", err);
     }
   };
+
+  // Close notifications dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="app-header">
@@ -84,6 +121,75 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading }) {
                       Dashboard
                     </NavLink>
                   </li>
+
+                  {/* Bell Icon with Unread Count Badge & Dropdown */}
+                  <li className="nav-item" style={{ position: 'relative' }} ref={dropdownRef}>
+                    <button 
+                      className="notification-bell-btn"
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      title="Notifications"
+                      aria-label="Notifications"
+                    >
+                      🔔
+                      {unreadCount > 0 && (
+                        <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                      )}
+                    </button>
+
+                    {dropdownOpen && (
+                      <div className="notification-dropdown">
+                        <div className="notification-header">
+                          <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-bright)' }}>
+                            Notifications {unreadCount > 0 && <span style={{ opacity: 0.7 }}>({unreadCount} unread)</span>}
+                          </div>
+                          {unreadCount > 0 && (
+                            <button 
+                              className="mark-all-btn"
+                              onClick={onMarkAllRead}
+                            >
+                              Mark all as read
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="notification-list">
+                          {notifications.length === 0 ? (
+                            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                              No notifications yet
+                            </div>
+                          ) : (
+                            notifications.map(item => {
+                              const isUnread = !readIds.has(item.id);
+                              const isReport = item.type === 'New Report';
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className={`notification-item ${isUnread ? 'unread' : ''}`}
+                                  onClick={() => onMarkRead(item.id)}
+                                >
+                                  <div className="notification-item-header">
+                                    <span className={`notification-tag ${isReport ? 'report-tag' : 'alert-tag'}`}>
+                                      {isReport ? '📝 New Report' : '🚨 Alert'}
+                                    </span>
+                                    <span className="notification-time">
+                                      {getTimeAgo(item.timestamp, item.timeRaw)}
+                                    </span>
+                                  </div>
+                                  <div className="notification-location">
+                                    📍 {item.location}
+                                  </div>
+                                  <div className="notification-details">
+                                    {item.severity ? `Severity: ${item.severity.toUpperCase()}` : ''} {item.details ? `— ${item.details}` : ''}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </li>
+
                   <li className="nav-item" style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="user-email-badge" style={{ margin: '0 8px' }}>
                       👤 {currentUser.email}
@@ -243,6 +349,124 @@ function App() {
     return () => clearInterval(interval);
   }, [activeAlert, dismissedAlertId]);
 
+  // Real-time notifications listener for citizen_reports & alerts collections
+  const [notifications, setNotifications] = useState([]);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('read_notifications_v1');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const handleMarkRead = (id) => {
+    setReadNotificationIds(prev => {
+      const updated = new Set(prev);
+      updated.add(id);
+      try {
+        localStorage.setItem('read_notifications_v1', JSON.stringify(Array.from(updated)));
+      } catch (e) { console.error(e); }
+      return updated;
+    });
+  };
+
+  const handleMarkAllRead = () => {
+    setReadNotificationIds(prev => {
+      const updated = new Set(prev);
+      notifications.forEach(n => updated.add(n.id));
+      try {
+        localStorage.setItem('read_notifications_v1', JSON.stringify(Array.from(updated)));
+      } catch (e) { console.error(e); }
+      return updated;
+    });
+  };
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let reportsList = [];
+    let alertsList = [];
+
+    const mergeNotifications = () => {
+      const combined = [...reportsList, ...alertsList];
+      combined.sort((a, b) => (b.timeRaw || 0) - (a.timeRaw || 0));
+      setNotifications(combined.slice(0, 20));
+    };
+
+    // 1. Citizen Reports real-time listener (ordered by timestamp desc, limit 20)
+    const reportsQuery = query(
+      collection(db, 'citizen_reports'),
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    );
+
+    const unsubReports = onSnapshot(reportsQuery, (snapshot) => {
+      reportsList = snapshot.docs.map(docItem => {
+        const data = docItem.data();
+        const timeMs = data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp?.seconds ? data.timestamp.seconds * 1000 : Date.now());
+        return {
+          id: `report_${docItem.id}`,
+          type: 'New Report',
+          location: data.location || 'Incident Area',
+          severity: data.severity || 'elevated',
+          details: data.details || '',
+          timestamp: data.timestamp,
+          timeRaw: timeMs
+        };
+      });
+      mergeNotifications();
+    }, (err) => console.warn("Citizen reports notification listener warn:", err));
+
+    // 2. Alerts real-time listener (ordered by timestamp desc, limit 20)
+    const alertsQuery = query(
+      collection(db, 'alerts'),
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    );
+
+    const unsubAlerts = onSnapshot(alertsQuery, (snapshot) => {
+      alertsList = snapshot.docs.map(docItem => {
+        const data = docItem.data();
+        const timeMs = data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp?.seconds ? data.timestamp.seconds * 1000 : Date.now());
+        return {
+          id: `alert_${docItem.id}`,
+          type: 'Alert',
+          location: data.zone || data.location || data.name || 'Risk Zone',
+          severity: data.status || data.risk || 'WARNING',
+          details: data.message || data.description || data.desc || '',
+          timestamp: data.timestamp,
+          timeRaw: timeMs
+        };
+      });
+      mergeNotifications();
+    }, (err) => {
+      // Fallback query on flood_events if alerts collection uses different structure
+      const fallbackQuery = query(collection(db, 'flood_events'), limit(20));
+      onSnapshot(fallbackQuery, (snapshot) => {
+        alertsList = snapshot.docs.map(docItem => {
+          const data = docItem.data();
+          const timeMs = data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp?.seconds ? data.timestamp.seconds * 1000 : Date.now());
+          return {
+            id: `alert_${docItem.id}`,
+            type: 'Alert',
+            location: data.name || 'Risk Zone',
+            severity: data.risk || data.status || 'WARNING',
+            details: data.desc || '',
+            timestamp: data.timestamp,
+            timeRaw: timeMs
+          };
+        });
+        mergeNotifications();
+      });
+    });
+
+    return () => {
+      unsubReports();
+      unsubAlerts();
+    };
+  }, [currentUser]);
+
   return (
     <Router>
       {/* Header and Navbar containing useNavigate must be a child of Router */}
@@ -250,6 +474,10 @@ function App() {
         backendHealthy={backendHealthy}
         currentUser={currentUser}
         authLoading={authLoading}
+        notifications={notifications}
+        readIds={readNotificationIds}
+        onMarkRead={handleMarkRead}
+        onMarkAllRead={handleMarkAllRead}
       />
 
       {/* Global Emergency Alert Banner */}
