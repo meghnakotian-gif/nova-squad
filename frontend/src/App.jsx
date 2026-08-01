@@ -4,7 +4,7 @@ import './App.css';
 
 // Import Firestore reference and functions
 import { db } from './firebase';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 
 // Base URL for the Flask backend API
 const BACKEND_URL = 'http://localhost:5000';
@@ -161,10 +161,58 @@ function HomeView() {
 
 function ReportFloodView() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const [formData, setFormData] = useState({
+    location: "",
+    severity: "",
+    email: "",
+    details: ""
+  });
+
+  const handleChange = (e) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setError("");
+
+    try {
+      // Get reference to the citizen_reports collection in Cloud Firestore
+      const reportsRef = collection(db, 'citizen_reports');
+
+      // Write the report details (excluding file attachment for now) to Firestore
+      await addDoc(reportsRef, {
+        location: formData.location,
+        severity: formData.severity,
+        email: formData.email,
+        details: formData.details,
+        timestamp: serverTimestamp()
+      });
+
+      // Clear the form state on successful write
+      setFormData({
+        location: "",
+        severity: "",
+        email: "",
+        details: ""
+      });
+
+      // Show success screen
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Firestore error logging incident: ", err);
+      setError("Unable to submit report. Please verify connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -172,10 +220,15 @@ function ReportFloodView() {
       <div className="form-header">
         <h2>Report Local Incident</h2>
         <p>Help refine our hydrological forecasts by submitting live sightings of flooding or high water conditions.</p>
+        {error && (
+          <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
+            ⚠️ {error}
+          </div>
+        )}
       </div>
 
       {submitted ? (
-        <div style={{ textalign: 'center', padding: '32px 0' }}>
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
           <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>✅</span>
           <h3 style={{ color: 'var(--text-bright)' }}>Report Logged</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
@@ -194,13 +247,23 @@ function ReportFloodView() {
               id="location" 
               className="form-input" 
               placeholder="e.g. Rio Negro Bridge Crossing (KM 12)" 
+              value={formData.location}
+              onChange={handleChange}
               required 
+              disabled={submitting}
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="severity">Visual Water Level Severity</label>
-            <select id="severity" className="form-select" required>
+            <select 
+              id="severity" 
+              className="form-select" 
+              value={formData.severity}
+              onChange={handleChange}
+              required
+              disabled={submitting}
+            >
               <option value="">Choose Severity Option...</option>
               <option value="normal">Normal Baseline (Safe)</option>
               <option value="elevated">Elevated (Flooded Banks)</option>
@@ -210,13 +273,16 @@ function ReportFloodView() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="reporter">Reporter Contact Email</label>
+            <label className="form-label" htmlFor="email">Reporter Contact Email</label>
             <input 
               type="email" 
-              id="reporter" 
+              id="email" 
               className="form-input" 
               placeholder="name@agency.gov" 
+              value={formData.email}
+              onChange={handleChange}
               required 
+              disabled={submitting}
             />
           </div>
 
@@ -226,19 +292,27 @@ function ReportFloodView() {
               id="details" 
               className="form-textarea" 
               placeholder="Provide a brief description of river state, blockages, or structures affected..."
+              value={formData.details}
+              onChange={handleChange}
+              disabled={submitting}
             ></textarea>
           </div>
 
           <div className="form-group">
             <label className="form-label">Sighting Documentation (Photos / Video)</label>
-            <div className="upload-zone">
+            <div className="upload-zone" style={{ opacity: submitting ? 0.5 : 1 }}>
               <span className="upload-icon">📸</span>
-              <span className="upload-text">Click or drag media files here to attach to incident log</span>
+              <span className="upload-text">Click or drag media files here to attach to incident log (Bypassed)</span>
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-            Submit Incident Sighting
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            style={{ width: '100%' }}
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting Sighting...' : 'Submit Incident Sighting'}
           </button>
         </form>
       )}
