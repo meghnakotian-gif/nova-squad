@@ -619,6 +619,10 @@ function ReportFloodView() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const [formData, setFormData] = useState({
     location: "",
@@ -635,33 +639,96 @@ function ReportFloodView() {
     }));
   };
 
+// Helper function to upload image file to ImgBB API with progress tracking
+const uploadToImgBB = (file, onProgress) => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const bodyData = new FormData();
+    bodyData.append('image', file);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          if (res.success && res.data && res.data.url) {
+            resolve(res.data.url);
+          } else {
+            reject(new Error(res.error?.message || "ImgBB upload failed"));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      } else {
+        reject(new Error(`ImgBB upload failed with status ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during ImgBB image upload"));
+
+    xhr.open('POST', 'https://api.imgbb.com/1/upload?key=c414c205b1db6c4b434019236c6041f9');
+    xhr.send(bodyData);
+  });
+};
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+      setUploadError("");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    setUploadError("");
+    setUploadProgress(0);
+
+    let photoUrl = null;
+
+    // Attempt photo upload to ImgBB if a file is selected
+    if (selectedFile) {
+      setUploadingPhoto(true);
+      try {
+        photoUrl = await uploadToImgBB(selectedFile, (progress) => {
+          setUploadProgress(progress);
+        });
+      } catch (err) {
+        console.warn("ImgBB photo upload failed, proceeding with report submission without photo:", err);
+        setUploadError("Photo upload failed, but your report is being logged.");
+        photoUrl = null;
+      } finally {
+        setUploadingPhoto(false);
+      }
+    }
 
     try {
-      // Get reference to the citizen_reports collection in Cloud Firestore
+      // Save report details with photoUrl (or null) to Firestore
       const reportsRef = collection(db, 'citizen_reports');
-
-      // Write the report details (excluding file attachment for now) to Firestore
       await addDoc(reportsRef, {
         location: formData.location,
         severity: formData.severity,
         email: formData.email,
         details: formData.details,
+        photoUrl: photoUrl || null,
         timestamp: serverTimestamp()
       });
 
-      // Clear the form state on successful write
+      // Reset form and file state
       setFormData({
         location: "",
         severity: "",
         email: "",
         details: ""
       });
-
-      // Show success screen
+      setSelectedFile(null);
       setSubmitted(true);
     } catch (err) {
       console.error("Firestore error logging incident: ", err);
@@ -755,11 +822,56 @@ function ReportFloodView() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Sighting Documentation (Photos / Video)</label>
-            <div className="upload-zone" style={{ opacity: submitting ? 0.5 : 1 }}>
+            <label className="form-label" htmlFor="photo">Sighting Documentation (Photos / Video)</label>
+            <div className="upload-zone" style={{ opacity: submitting ? 0.6 : 1, position: 'relative', cursor: 'pointer' }}>
+              <input 
+                type="file" 
+                id="photo" 
+                accept="image/*" 
+                onChange={handleFileChange}
+                disabled={submitting}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  opacity: 0,
+                  cursor: submitting ? 'not-allowed' : 'pointer'
+                }}
+              />
               <span className="upload-icon">📸</span>
-              <span className="upload-text">Click or drag media files here to attach to incident log (Bypassed)</span>
+              {selectedFile ? (
+                <div style={{ textAlign: 'center' }}>
+                  <span className="upload-text" style={{ color: 'var(--text-bright)', fontWeight: 'bold' }}>
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                  </span>
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-primary)', marginTop: '4px' }}>
+                    Click to change selected photo
+                  </span>
+                </div>
+              ) : (
+                <span className="upload-text">Click or drag media files here to attach photo to incident log</span>
+              )}
             </div>
+
+            {uploadingPhoto && (
+              <div style={{ marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  <span>Uploading photo to Storage...</span>
+                  <span><strong>{uploadProgress}%</strong></span>
+                </div>
+                <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'var(--color-primary)', transition: 'width 0.2s ease' }}></div>
+                </div>
+              </div>
+            )}
+
+            {uploadError && (
+              <div style={{ color: 'var(--color-warning)', fontSize: '12px', marginTop: '6px', fontWeight: '600' }}>
+                ⚠️ {uploadError}
+              </div>
+            )}
           </div>
 
           <button 
@@ -768,7 +880,7 @@ function ReportFloodView() {
             style={{ width: '100%' }}
             disabled={submitting}
           >
-            {submitting ? 'Submitting Sighting...' : 'Submit Incident Sighting'}
+            {submitting ? (uploadingPhoto ? `Uploading Photo (${uploadProgress}%)...` : 'Saving Report...') : 'Submit Incident Sighting'}
           </button>
         </form>
       )}

@@ -21,3 +21,5 @@ export const db = getFirestore(app);
 
 // Initialize Firebase Authentication instance and export it
 export const auth = getAuth(app);
+
+
