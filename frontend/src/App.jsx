@@ -163,7 +163,7 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
               </select>
             </li>
 
-            {/* SOS Emergency Helpline Button (visible on all pages) */}
+            {/* Disaster Helpline Button (visible on all pages) */}
             <li className="nav-item">
               <a 
                 href="tel:1077"
@@ -187,7 +187,7 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
                   cursor: 'pointer'
                 }}
               >
-                🆘 {t.sosButton || 'SOS 1077'}
+                📞 {t.sosButton || 'Helpline 1077'}
               </a>
             </li>
 
@@ -2339,13 +2339,13 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
         flexWrap: 'wrap'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '32px', filter: 'drop-shadow(0 0 8px #ff3e3e)' }}>🆘</span>
+          <span style={{ fontSize: '32px', filter: 'drop-shadow(0 0 8px #ff3e3e)' }}>📞</span>
           <div>
             <div style={{ fontWeight: '800', fontSize: '15.5px', color: '#ff5252', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
-              {t.emergencyHeader || 'EMERGENCY DISASTER HELPLINE'}
+              {t.emergencyHeader || 'DISASTER HELPLINE'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-bright)', marginTop: '2px', opacity: 0.9 }}>
-              {t.callEmergencyServices || 'Call Emergency Services (Toll-Free 1077 / 108)'}
+              {t.callEmergencyServices || 'Call Disaster Helpline (Toll-Free 1077 / 108)'}
             </div>
           </div>
         </div>
