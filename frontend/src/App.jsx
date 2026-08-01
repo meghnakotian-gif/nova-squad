@@ -1277,6 +1277,14 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
         L.latLng(start[0], start[1]),
         L.latLng(end[0], end[1])
       ],
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1',
+        profile: 'car',
+        useHints: false,
+        options: {
+          alternatives: true
+        }
+      }),
       routeWhileDragging: false,
       showAlternatives: true,
       altLineOptions: { styles: [{ opacity: 0 }] },
@@ -1294,7 +1302,7 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
       if (!routes || routes.length === 0) return;
 
       // Evaluate hazard overlap scores for candidate routes (avoid High Risk, prefer Safe, use Medium Risk only if needed)
-      const evaluated = routes.map((r) => {
+      const evaluated = routes.map((r, idx) => {
         let highRiskCount = 0;
         let mediumRiskCount = 0;
         const coords = r.coordinates || [];
@@ -1312,7 +1320,7 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
               const zLng = parseFloat(rawZLng);
               if (!isNaN(zLat) && !isNaN(zLng)) {
                 const dist = map.distance([coord.lat, coord.lng], [zLat, zLng]);
-                const threshold = (parseFloat(zone.radius) || 1500) + 200;
+                const threshold = (parseFloat(zone.radius) || 1400) + 200;
                 if (dist < threshold) {
                   if (isHighRisk) highRiskCount++;
                   else if (isMediumRisk) mediumRiskCount++;
@@ -1321,10 +1329,15 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
             }
           }
         }
-        return { route: r, highRiskCount, mediumRiskCount };
+        return { index: idx, route: r, highRiskCount, mediumRiskCount };
       });
 
-      // Sort routes: 1. Minimize High Risk, 2. Minimize Medium Risk, 3. Minimize total distance
+      const directRouteEval = evaluated.find(item => item.index === 0) || evaluated[0];
+      const directHasHighRisk = directRouteEval.highRiskCount > 0;
+      const directHasMediumRisk = directRouteEval.mediumRiskCount > 0;
+      const directHasAnyRisk = directHasHighRisk || directHasMediumRisk;
+
+      // Sort candidate routes: 1. Minimize High Risk, 2. Minimize Medium Risk, 3. Minimize total distance
       evaluated.sort((a, b) => {
         if (a.highRiskCount !== b.highRiskCount) return a.highRiskCount - b.highRiskCount;
         if (a.mediumRiskCount !== b.mediumRiskCount) return a.mediumRiskCount - b.mediumRiskCount;
@@ -1342,18 +1355,36 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
       let mins = Math.round((summary.totalTime % 3600) / 60);
       let timeStr = hrs > 0 ? `${hrs} hr ${mins} mins` : `${mins} mins`;
 
-      const hasHighRisk = selected.highRiskCount > 0;
-      const hasMediumRisk = selected.mediumRiskCount > 0;
+      const selectedHasHighRisk = selected.highRiskCount > 0;
+      const selectedHasMediumRisk = selected.mediumRiskCount > 0;
+      const selectedHasAnyRisk = selectedHasHighRisk || selectedHasMediumRisk;
+
+      let warningMsg = '';
+      let isUnsafe = false;
+
+      if (!directHasAnyRisk) {
+        // Direct route is already completely safe
+        warningMsg = '✅ Safe Route: No active flood hazards along route.';
+        isUnsafe = false;
+      } else if (!selectedHasAnyRisk) {
+        // Alternative route successfully avoided ALL risk zones
+        warningMsg = '🛡️ Rerouted: Alternative route selected to avoid active risk zones.';
+        isUnsafe = false;
+      } else if (selected.highRiskCount < directRouteEval.highRiskCount) {
+        // Rerouted to avoid High Risk (CRITICAL) areas, though passes through Medium Risk
+        warningMsg = '⚠️ CAUTION: Rerouted through Medium Risk area (avoiding High Risk flood zones).';
+        isUnsafe = false;
+      } else {
+        // No risk-free alternative exists within available OSRM routes
+        warningMsg = '⚠️ WARNING: No safer alternative found — proceed with caution.';
+        isUnsafe = true;
+      }
 
       setRouteInfo({
         distance: (summary.totalDistance / 1000).toFixed(1) + ' km',
         time: timeStr,
-        unsafe: hasHighRisk,
-        warningMsg: hasHighRisk
-          ? '⚠️ WARNING: Route passes through a High Risk flood zone.'
-          : hasMediumRisk
-          ? '⚠️ CAUTION: Rerouted through Medium Risk area (avoiding High Risk flood zones).'
-          : '✅ Safe Route: No active flood hazards along route.'
+        unsafe: isUnsafe,
+        warningMsg: warningMsg
       });
     });
 
@@ -1960,9 +1991,34 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
             )}
 
             {routeInfo && !routeError && (
-              <div style={{ marginTop: '12px', padding: '12px', borderRadius: '4px', background: routeInfo.unsafe ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)', border: `1px solid ${routeInfo.unsafe ? '#ef4444' : '#22c55e'}` }}>
-                <p style={{ margin: '0 0 8px', color: routeInfo.unsafe ? '#ef4444' : '#22c55e', fontWeight: 'bold', fontSize: '13px' }}>
-                  {routeInfo.warningMsg || (routeInfo.unsafe ? '⚠️ WARNING: Route passes through a High Risk flood zone.' : '✅ Safe Route: No active flood hazards detected.')}
+              <div style={{
+                marginTop: '12px',
+                padding: '12px',
+                borderRadius: '4px',
+                background: routeInfo.unsafe
+                  ? 'rgba(239, 68, 68, 0.1)'
+                  : routeInfo.warningMsg?.includes('CAUTION')
+                  ? 'rgba(234, 179, 8, 0.1)'
+                  : 'rgba(34, 197, 94, 0.1)',
+                border: `1px solid ${
+                  routeInfo.unsafe
+                    ? '#ef4444'
+                    : routeInfo.warningMsg?.includes('CAUTION')
+                    ? '#eab308'
+                    : '#22c55e'
+                }`
+              }}>
+                <p style={{
+                  margin: '0 0 8px',
+                  color: routeInfo.unsafe
+                    ? '#ef4444'
+                    : routeInfo.warningMsg?.includes('CAUTION')
+                    ? '#eab308'
+                    : '#22c55e',
+                  fontWeight: 'bold',
+                  fontSize: '13px'
+                }}>
+                  {routeInfo.warningMsg || (routeInfo.unsafe ? '⚠️ WARNING: No safer alternative found — proceed with caution.' : '✅ Safe Route: No active flood hazards detected.')}
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
                   <span>Distance: <strong>{routeInfo.distance}</strong></span>
