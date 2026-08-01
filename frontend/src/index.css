@@ -1010,3 +1010,60 @@ body {
 .app-footer a:hover {
   text-decoration: underline;
 }
+
+/* ==========================================
+   AUTHENTICATION VIEWS STYLING
+   ========================================== */
+
+.auth-layout {
+  max-width: 440px;
+  margin: 40px auto;
+  width: 100%;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-header h2 {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  color: var(--text-bright);
+  margin: 0 0 8px;
+}
+
+.auth-header p {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.auth-footer a {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.user-email-badge {
+  font-size: 12.5px;
+  color: var(--text-bright);
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-muted);
+  display: inline-block;
+}
+

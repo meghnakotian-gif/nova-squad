@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
 import './App.css';
 
-// Import Firestore reference and functions
-import { db } from './firebase';
+// Import Firestore & Auth references and functions
+import { db, auth } from './firebase';
 import { collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
 
 // Base URL for the Flask backend API
 const BACKEND_URL = 'https://nova-squad-backend.onrender.com';
@@ -13,9 +19,108 @@ const BACKEND_URL = 'https://nova-squad-backend.onrender.com';
 // ROOT COMPONENT WITH ROUTER
 // ==========================================
 
+function HeaderNavbar({ backendHealthy, currentUser, authLoading }) {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // Redirect successfully logged-out users to Login page
+      navigate("/login");
+    } catch (err) {
+      console.error("Sign out process failed: ", err);
+    }
+  };
+
+  return (
+    <header className="app-header">
+      <div className="brand-section">
+        <h1>
+          🌊 Flood Pulse AI <span className="brand-badge">Engine v1.0</span>
+        </h1>
+      </div>
+
+      <div className="header-actions">
+        {/* Navigation Bar */}
+        <nav className="navbar">
+          <ul className="nav-list">
+            <li className="nav-item">
+              <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                Home
+              </NavLink>
+            </li>
+            <li className="nav-item">
+              <NavLink to="/live-map" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                Live Map
+              </NavLink>
+            </li>
+            <li className="nav-item">
+              <NavLink to="/report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                Report Flood
+              </NavLink>
+            </li>
+            <li className="nav-item">
+              <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                Dashboard
+              </NavLink>
+            </li>
+            
+            {/* Dynamic authentication state triggers */}
+            {!authLoading && (
+              currentUser ? (
+                <>
+                  <li className="nav-item" style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="user-email-badge" style={{ margin: '0 8px' }}>
+                      👤 {currentUser.email}
+                    </span>
+                  </li>
+                  <li className="nav-item">
+                    <button 
+                      className="nav-link" 
+                      onClick={handleLogout}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', outline: 'none' }}
+                    >
+                      Logout
+                    </button>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="nav-item">
+                    <NavLink to="/login" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                      Login
+                    </NavLink>
+                  </li>
+                  <li className="nav-item">
+                    <NavLink to="/signup" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                      Signup
+                    </NavLink>
+                  </li>
+                </>
+              )
+            )}
+          </ul>
+        </nav>
+
+        {/* Backend Connectivity Status Dot */}
+        <div className="status-badge">
+          <span className={`status-dot ${backendHealthy ? 'healthy' : 'unhealthy'}`}></span>
+          <span>
+            Backend: {backendHealthy === null ? 'Checking...' : backendHealthy ? 'Connected' : 'Standalone'}
+          </span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function App() {
   // Global backend health status state (checked at root level to show in navbar header)
   const [backendHealthy, setBackendHealthy] = useState(null);
+
+  // Authentication session tracking states
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Poll backend health status
   const checkBackendHealth = async () => {
@@ -36,55 +141,27 @@ function App() {
   useEffect(() => {
     checkBackendHealth();
     const interval = setInterval(checkBackendHealth, 15000);
-    return () => clearInterval(interval);
+    
+    // Subscribe to Firebase Authentication session transitions
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribeAuth();
+    };
   }, []);
 
   return (
     <Router>
-      {/* App Header & Navbar */}
-      <header className="app-header">
-        <div className="brand-section">
-          <h1>
-            🌊 Flood Pulse AI <span className="brand-badge">Engine v1.0</span>
-          </h1>
-        </div>
-
-        <div className="header-actions">
-          {/* Navigation Bar */}
-          <nav className="navbar">
-            <ul className="nav-list">
-              <li className="nav-item">
-                <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                  Home
-                </NavLink>
-              </li>
-              <li className="nav-item">
-                <NavLink to="/live-map" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                  Live Map
-                </NavLink>
-              </li>
-              <li className="nav-item">
-                <NavLink to="/report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                  Report Flood
-                </NavLink>
-              </li>
-              <li className="nav-item">
-                <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                  Dashboard
-                </NavLink>
-              </li>
-            </ul>
-          </nav>
-
-          {/* Backend Connectivity Status Dot */}
-          <div className="status-badge">
-            <span className={`status-dot ${backendHealthy ? 'healthy' : 'unhealthy'}`}></span>
-            <span>
-              Backend: {backendHealthy === null ? 'Checking...' : backendHealthy ? 'Connected' : 'Standalone'}
-            </span>
-          </div>
-        </div>
-      </header>
+      {/* Header and Navbar containing useNavigate must be a child of Router */}
+      <HeaderNavbar 
+        backendHealthy={backendHealthy}
+        currentUser={currentUser}
+        authLoading={authLoading}
+      />
 
       {/* Routed Pages Area */}
       <Routes>
@@ -92,6 +169,8 @@ function App() {
         <Route path="/live-map" element={<LiveMapView />} />
         <Route path="/report" element={<ReportFloodView />} />
         <Route path="/dashboard" element={<DashboardView backendHealthy={backendHealthy} />} />
+        <Route path="/login" element={<LoginView />} />
+        <Route path="/signup" element={<SignupView />} />
       </Routes>
 
       {/* Global Footer */}
@@ -101,6 +180,223 @@ function App() {
         </p>
       </footer>
     </Router>
+  );
+}
+
+// ==========================================
+// LOGIN VIEW (Firebase Email/Password Auth)
+// ==========================================
+
+function LoginView() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Redirect successfully authenticated users to Home page
+      navigate("/");
+    } catch (err) {
+      console.error("Authentication check failed: ", err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        setError("Invalid email address or password.");
+      } else {
+        setError("Authentication failed. Please verify credentials and try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-layout panel pulsing-glow">
+      <div className="auth-header">
+        <h2>Welcome Back</h2>
+        <p>Log in to access your forecasting settings and telemetry database.</p>
+        {error && (
+          <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
+            ⚠️ {error}
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleLogin}>
+        <div className="form-group">
+          <label className="form-label" htmlFor="login_email">Email Address</label>
+          <input 
+            type="email" 
+            id="login_email" 
+            className="form-input" 
+            placeholder="user@example.com" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required 
+            disabled={loading}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="login_password">Password</label>
+          <input 
+            type="password" 
+            id="login_password" 
+            className="form-input" 
+            placeholder="••••••••" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required 
+            disabled={loading}
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          className="btn btn-primary" 
+          style={{ width: '100%', marginTop: '8px' }} 
+          disabled={loading}
+        >
+          {loading ? 'Signing In...' : 'Sign In'}
+        </button>
+      </form>
+
+      <div className="auth-footer">
+        Don't have an account? <Link to="/signup">Sign Up</Link>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// SIGNUP VIEW (Firebase Register + Firestore user record)
+// ==========================================
+
+function SignupView() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Create user credential in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Save user reference record in Firestore's 'users' collection
+      const userDocRef = doc(db, 'users', user.uid);
+      await setDoc(userDocRef, {
+        email: email,
+        createdAt: serverTimestamp()
+      });
+
+      // Redirect successfully registered users to Home page
+      navigate("/");
+    } catch (err) {
+      console.error("Account registration check failed: ", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError("This email address is already registered.");
+      } else {
+        setError("Failed to create account. Please verify input formats.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-layout panel pulsing-glow">
+      <div className="auth-header">
+        <h2>Create Account</h2>
+        <p>Register to participate in forecasting and flood sighting reports.</p>
+        {error && (
+          <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginTop: '12px', fontWeight: '600' }}>
+            ⚠️ {error}
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSignup}>
+        <div className="form-group">
+          <label className="form-label" htmlFor="signup_email">Email Address</label>
+          <input 
+            type="email" 
+            id="signup_email" 
+            className="form-input" 
+            placeholder="user@example.com" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required 
+            disabled={loading}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="signup_password">Password (min 6 chars)</label>
+          <input 
+            type="password" 
+            id="signup_password" 
+            className="form-input" 
+            placeholder="••••••••" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required 
+            disabled={loading}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="signup_confirm_password">Confirm Password</label>
+          <input 
+            type="password" 
+            id="signup_confirm_password" 
+            className="form-input" 
+            placeholder="••••••••" 
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required 
+            disabled={loading}
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          className="btn btn-primary" 
+          style={{ width: '100%', marginTop: '8px' }} 
+          disabled={loading}
+        >
+          {loading ? 'Creating Account...' : 'Sign Up'}
+        </button>
+      </form>
+
+      <div className="auth-footer">
+        Already have an account? <Link to="/login">Log In</Link>
+      </div>
+    </div>
   );
 }
 
