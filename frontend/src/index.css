@@ -1236,5 +1236,21 @@ body {
   display: none !important;
 }
 
+/* Custom Tooltip Label for Leaflet Risk Zone Area Overlays */
+.zone-map-label {
+  background: rgba(15, 18, 26, 0.88) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 6px !important;
+  color: #ffffff !important;
+  padding: 4px 8px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+.zone-map-label::before {
+  display: none !important;
+}
+
+
 
 

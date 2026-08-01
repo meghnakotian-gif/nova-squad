@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate, Nav
 import './App.css';
 
 // Import Leaflet & React-Leaflet packages for interactive mapping
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Circle, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
@@ -825,14 +825,25 @@ function SafeRouteMachine({ start, end, zones, setRouteInfo, setRouteCoords }) {
       let unsafe = false;
       for (const coord of coordinates) {
         for (const zone of zones) {
-          if (zone.status === 'CRITICAL' || zone.status === 'WARNING') {
-            const zLat = zone.latitude;
-            const zLng = zone.longitude;
-            if (zLat !== undefined && zLng !== undefined) {
-              const dist = map.distance([coord.lat, coord.lng], [zLat, zLng]);
-              if (dist < 2500) { // 2.5km warning threshold
-                unsafe = true;
-                break;
+          const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
+          const riskStr = ((zone.risk || zone.status || '') + '').toUpperCase();
+          const isHazardous = statusStr.includes('CRITICAL') || statusStr.includes('WARNING') || 
+                              riskStr.includes('CRITICAL') || riskStr.includes('WARNING') || 
+                              statusStr.includes('EVACUATION') || riskStr.includes('MONITORING');
+
+          if (isHazardous) {
+            const rawZLat = zone.lat ?? zone.latitude ?? zone.y_coord;
+            const rawZLng = zone.lng ?? zone.longitude ?? zone.x_coord;
+            if (rawZLat !== undefined && rawZLng !== undefined && rawZLat !== null && rawZLng !== null) {
+              const zLat = parseFloat(rawZLat);
+              const zLng = parseFloat(rawZLng);
+              if (!isNaN(zLat) && !isNaN(zLng)) {
+                const dist = map.distance([coord.lat, coord.lng], [zLat, zLng]);
+                const threshold = (parseFloat(zone.radius) || 1500) + 500;
+                if (dist < threshold) {
+                  unsafe = true;
+                  break;
+                }
               }
             }
           }
@@ -991,6 +1002,8 @@ function LiveMapView() {
             status: 'NORMAL',
             risk: 'LOW RISK',
             desc: 'No overtopping detected. Standard river discharge levels.',
+            lat: 12.9916,
+            lng: 77.5646,
             latitude: 12.9916,
             longitude: 77.5646,
             marker_class: 'healthy-marker'
@@ -1002,6 +1015,8 @@ function LiveMapView() {
             status: 'CRITICAL',
             risk: 'CRITICAL EVACUATION',
             desc: 'Water levels exceeding critical flood limits. Evacuating agricultural fields.',
+            lat: 12.9516,
+            lng: 77.6146,
             latitude: 12.9516,
             longitude: 77.6146,
             marker_class: 'critical-marker'
@@ -1013,6 +1028,8 @@ function LiveMapView() {
             status: 'WARNING',
             risk: 'ELEVATED MONITORING',
             desc: 'Active runoff and elevated water level. Watching river pulse velocity closely.',
+            lat: 13.0016,
+            lng: 77.6046,
             latitude: 13.0016,
             longitude: 77.6046,
             marker_class: 'warning-marker'
@@ -1034,6 +1051,8 @@ function LiveMapView() {
       snapshot.forEach((doc) => {
         zonesData.push({ id: doc.id, ...doc.data() });
       });
+
+      console.log("🔥 [Firestore Debug] Raw flood_events fetched from Firestore:", zonesData);
 
       setZones(zonesData);
 
@@ -1091,8 +1110,8 @@ function LiveMapView() {
           {/* Leaflet React Map Container */}
           <MapContainer center={userLoc} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             
             {/* User current location indicator marker */}
@@ -1119,40 +1138,75 @@ function LiveMapView() {
               </Marker>
             )}
 
-            {/* Render Firestore flood_events markers */}
+            {/* Render Firestore flood_events colored risk zone area overlays */}
             {zones.map((zone) => {
-              const lat = zone.latitude;
-              const lng = zone.longitude;
-              if (lat === undefined || lng === undefined) return null;
+              const rawLat = zone.lat ?? zone.latitude ?? zone.y_coord;
+              const rawLng = zone.lng ?? zone.longitude ?? zone.x_coord;
+              
+              if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) return null;
 
-              const statusStr = zone.status || 'NORMAL';
-              const riskStr = zone.risk || 'LOW RISK';
+              const lat = parseFloat(rawLat);
+              const lng = parseFloat(rawLng);
+
+              if (isNaN(lat) || isNaN(lng)) return null;
+
+              const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
+              const riskStr = zone.risk || zone.status || 'LOW RISK';
+
+              const isCritical = statusStr.includes('CRITICAL') || statusStr.includes('EVACUATION');
+              const isWarning = statusStr.includes('WARNING') || statusStr.includes('ELEVATED') || statusStr.includes('MONITORING');
+
+              const strokeColor = isCritical ? '#dc3545' : isWarning ? '#e6a100' : '#28a745';
+              const fillColor = isCritical ? '#dc3545' : isWarning ? '#ffc107' : '#28a745';
 
               return (
-                <Marker 
+                <Circle 
                   key={zone.id} 
-                  position={[lat, lng]} 
-                  icon={getMarkerIcon(statusStr)}
+                  center={[lat, lng]} 
+                  radius={zone.radius || 1500}
+                  pathOptions={{
+                    color: strokeColor,
+                    fillColor: fillColor,
+                    fillOpacity: isCritical ? 0.40 : isWarning ? 0.35 : 0.28,
+                    weight: 2.5,
+                    dashArray: isWarning ? '6, 6' : undefined
+                  }}
                   eventHandlers={{
                     click: () => setSelectedZone(zone)
                   }}
                 >
+                  <Tooltip permanent direction="center" className="zone-map-label">
+                    <div style={{ textAlign: 'center', lineHeight: '1.2' }}>
+                      <div style={{ fontWeight: '700', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+                        {zone.name || 'Flood Zone'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '10px', 
+                        fontWeight: '800',
+                        marginTop: '2px',
+                        color: isCritical ? '#ff6b6b' : isWarning ? '#ffe066' : '#51cf66'
+                      }}>
+                        {riskStr}
+                      </div>
+                    </div>
+                  </Tooltip>
+
                   <Popup>
                     <div style={{ fontSize: '12.5px', padding: '2px' }}>
                       <h4 style={{ margin: '0 0 6px', fontWeight: '700', borderBottom: '1px solid #333', paddingBottom: '4px' }}>
-                        {zone.name}
+                        {zone.name || 'Flood Event Zone'}
                       </h4>
                       <div style={{ marginBottom: '4px' }}>
-                        Water Level: <strong>{zone.level}</strong>
+                        Water Level: <strong>{zone.level || 'N/A'}</strong>
                       </div>
                       <div>
                         Status: <strong style={{ 
-                          color: statusStr === 'CRITICAL' ? 'var(--color-danger)' : statusStr === 'WARNING' ? 'var(--color-warning)' : 'var(--color-success)'
+                          color: isCritical ? 'var(--color-danger)' : isWarning ? 'var(--color-warning)' : 'var(--color-success)'
                         }}>{riskStr}</strong>
                       </div>
                     </div>
                   </Popup>
-                </Marker>
+                </Circle>
               );
             })}
 
