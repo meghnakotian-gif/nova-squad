@@ -1237,17 +1237,17 @@ body {
 }
 
 /* Custom Tooltip Label for Leaflet Risk Zone Area Overlays */
-.zone-map-label {
-  background: rgba(15, 18, 26, 0.88) !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  border-radius: 6px !important;
+.zone-map-label, .risk-zone-floating-label {
+  background: rgba(15, 18, 26, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
   color: #ffffff !important;
-  padding: 4px 8px !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+  padding: 6px 12px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6) !important;
   pointer-events: auto !important;
   cursor: pointer;
 }
-.zone-map-label::before {
+.zone-map-label::before, .risk-zone-floating-label::before {
   display: none !important;
 }
 

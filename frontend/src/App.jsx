@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate, Nav
 import './App.css';
 
 // Import Leaflet & React-Leaflet packages for interactive mapping
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Circle, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Circle, Polygon, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
@@ -1399,7 +1399,28 @@ function LiveMapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Dynamically generate 5 sample points in a ~1.5km radius around mapCenter & fetch live rainfall from OpenWeatherMap
+// Helper to generate an irregular, organic blob polygon (8 vertices) around a center coordinate
+function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed = 1) {
+  const numVertices = 8;
+  const positions = [];
+
+  const pseudoRandom = (idx) => {
+    const sinVal = Math.sin(seed * 78.233 + idx * 12.9898) * 43758.5453;
+    return sinVal - Math.floor(sinVal);
+  };
+
+  for (let i = 0; i < numVertices; i++) {
+    const angle = (i * 2 * Math.PI) / numVertices;
+    const r = baseRadius * (0.70 + pseudoRandom(i) * 0.60);
+    const latOffset = r * Math.cos(angle);
+    const lngOffset = (r * Math.sin(angle)) / Math.cos(centerLat * (Math.PI / 180));
+    positions.push([centerLat + latOffset, centerLng + lngOffset]);
+  }
+
+  return positions;
+}
+
+  // Dynamically generate exactly 3 adjacent irregular blob risk zones (Critical, Warning, Normal) around mapCenter & fetch live rainfall from OpenWeatherMap
   useEffect(() => {
     if (!mapCenter || mapCenter.length < 2) return;
     const [cLat, cLng] = mapCenter;
@@ -1407,13 +1428,11 @@ function LiveMapView() {
 
     const apiKey = "a770b95390e72d4ac82fab668028f53a";
 
-    // 5 sample points distributed around mapCenter (~1.5km radius offsets)
+    // 3 adjacent sector configurations around mapCenter
     const sampleConfigs = [
-      { id: `dyn_center_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'Central Confluence Zone', latOff: 0, lngOff: 0 },
-      { id: `dyn_north_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North Sector Outflow', latOff: 0.009, lngOff: 0.003 },
-      { id: `dyn_southeast_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South-East Basin', latOff: -0.007, lngOff: 0.008 },
-      { id: `dyn_west_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'West Tributary Catchment', latOff: 0.002, lngOff: -0.010 },
-      { id: `dyn_southwest_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South-West Drainage Field', latOff: -0.008, lngOff: -0.005 }
+      { id: `dyn_nw_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North River Basin', latOff: 0.005, lngOff: -0.005, defaultStatus: 'CRITICAL', defaultRisk: 'CRITICAL EVACUATION', seed: 101 },
+      { id: `dyn_east_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'East Delta District', latOff: 0.004, lngOff: 0.006, defaultStatus: 'WARNING', defaultRisk: 'ELEVATED MONITORING', seed: 202 },
+      { id: `dyn_south_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South Outflow Plain', latOff: -0.006, lngOff: -0.001, defaultStatus: 'NORMAL', defaultRisk: 'LOW RISK', seed: 303 }
     ];
 
     const fetchDynamicRiskZones = async () => {
@@ -1423,9 +1442,9 @@ function LiveMapView() {
           const lng = cLng + cfg.lngOff;
           
           let rain1h = 0;
-          let desc = "Standard hydrological monitoring zone.";
-          let status = 'NORMAL';
-          let risk = 'LOW RISK';
+          let desc = "Neighborhood hydrological risk zone.";
+          let status = cfg.defaultStatus;
+          let risk = cfg.defaultRisk;
 
           try {
             const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`;
@@ -1435,30 +1454,27 @@ function LiveMapView() {
               rain1h = data.rain?.['1h'] || (data.rain?.['3h'] ? data.rain['3h'] / 3 : 0);
               desc = `${data.weather?.[0]?.description || 'Live weather'}. Temp: ${data.main?.temp || 'N/A'}°C, Humidity: ${data.main?.humidity || 'N/A'}%.`;
 
-              console.log(`🌧️ [Dynamic Weather Point] ${cfg.name} (${lat.toFixed(4)}, ${lng.toFixed(4)}):`, {
+              console.log(`🌧️ [3-Zone Weather Point] ${cfg.name} (${lat.toFixed(4)}, ${lng.toFixed(4)}):`, {
                 rainfall_1h_mm: rain1h,
                 weather_main: data.weather?.[0]?.main,
                 full_response: data
               });
+
+              // Apply live rainfall threshold overrides if thresholds are triggered
+              if (rain1h > 20) {
+                status = 'CRITICAL';
+                risk = 'CRITICAL EVACUATION';
+              } else if (rain1h > 10) {
+                status = 'WARNING';
+                risk = 'ELEVATED MONITORING';
+              }
             }
           } catch (err) {
             console.warn(`Weather fetch failed for ${cfg.name}:`, err);
           }
 
-          // Risk classification rules based purely on current rainfall:
-          // > 20mm/hour => CRITICAL (red)
-          // > 10mm/hour => WARNING (yellow)
-          // otherwise => NORMAL (green)
-          if (rain1h > 20) {
-            status = 'CRITICAL';
-            risk = 'CRITICAL EVACUATION';
-          } else if (rain1h > 10) {
-            status = 'WARNING';
-            risk = 'ELEVATED MONITORING';
-          } else {
-            status = 'NORMAL';
-            risk = 'LOW RISK';
-          }
+          // Generate organic, non-circular 8-point polygon boundary around center
+          const polygonPoints = generateIrregularBlob(lat, lng, 0.007, cfg.seed);
 
           return {
             id: cfg.id,
@@ -1472,7 +1488,8 @@ function LiveMapView() {
             level: `${(rain1h * 0.15 + 2.5).toFixed(1)}m`,
             rainfall_mm: rain1h,
             desc: desc,
-            radius: 1400
+            polygonPoints: polygonPoints,
+            radius: 1200
           };
         }));
 
@@ -1481,7 +1498,7 @@ function LiveMapView() {
           setSelectedZone(newZones[0]);
         }
       } catch (err) {
-        console.error("Error generating dynamic risk zones:", err);
+        console.error("Error generating 3-zone dynamic risk map:", err);
       } finally {
         setLoading(false);
       }
@@ -1555,23 +1572,17 @@ function LiveMapView() {
               </Marker>
             )}
 
-            {/* Render Firestore flood_events colored risk zone area overlays */}
+            {/* Render dynamic 3-zone irregular blob risk area polygons */}
             {zones.map((zone) => {
               const rawLat = zone.lat ?? zone.latitude;
               const rawLng = zone.lng ?? zone.longitude;
               
-              if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) {
-                console.warn(`⚠️ [Zone Render Warning] Skipping zone "${zone.name}" (${zone.id}) — no valid lat/lng coordinates.`);
-                return null;
-              }
+              if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) return null;
 
               const lat = parseFloat(rawLat);
               const lng = parseFloat(rawLng);
 
               if (isNaN(lat) || isNaN(lng)) return null;
-
-              // Log confirmed real-world lat/lng coordinates being used for each zone
-              console.log(`📍 [Zone Coordinates] Zone "${zone.name}" (${zone.id}): lat=${lat}, lng=${lng}`);
 
               const statusStr = ((zone.status || zone.risk || '') + '').toUpperCase();
               const riskStr = zone.risk || zone.status || 'LOW RISK';
@@ -1579,35 +1590,33 @@ function LiveMapView() {
               const isCritical = statusStr.includes('CRITICAL') || statusStr.includes('EVACUATION');
               const isWarning = statusStr.includes('WARNING') || statusStr.includes('ELEVATED') || statusStr.includes('MONITORING');
 
-              const strokeColor = isCritical ? '#dc3545' : isWarning ? '#e6a100' : '#28a745';
-              const fillColor = isCritical ? '#dc3545' : isWarning ? '#ffc107' : '#28a745';
+              const strokeColor = isCritical ? '#dc3545' : isWarning ? '#d97706' : '#059669';
+              const fillColor = isCritical ? '#dc3545' : isWarning ? '#f59e0b' : '#10b981';
 
               return (
-                <Circle 
+                <Polygon 
                   key={zone.id} 
-                  center={[lat, lng]} 
-                  radius={zone.radius || 1500}
+                  positions={zone.polygonPoints || generateIrregularBlob(lat, lng, 0.007, 1)} 
                   pathOptions={{
                     color: strokeColor,
                     fillColor: fillColor,
-                    fillOpacity: isCritical ? 0.40 : isWarning ? 0.35 : 0.28,
-                    weight: 2.5,
-                    dashArray: isWarning ? '6, 6' : undefined
+                    fillOpacity: isCritical ? 0.58 : isWarning ? 0.54 : 0.50,
+                    weight: 2.5
                   }}
                   eventHandlers={{
                     click: () => setSelectedZone(zone)
                   }}
                 >
-                  <Tooltip permanent direction="center" className="zone-map-label">
+                  <Tooltip permanent direction="center" className="risk-zone-floating-label">
                     <div style={{ textAlign: 'center', lineHeight: '1.2' }}>
-                      <div style={{ fontWeight: '700', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
-                        {zone.name || 'Flood Zone'}
+                      <div style={{ fontWeight: '800', fontSize: '12px', color: '#ffffff', whiteSpace: 'nowrap' }}>
+                        {zone.name || 'Risk Zone'}
                       </div>
                       <div style={{ 
                         fontSize: '10px', 
-                        fontWeight: '800',
-                        marginTop: '2px',
-                        color: isCritical ? '#ff6b6b' : isWarning ? '#ffe066' : '#51cf66'
+                        fontWeight: '700',
+                        marginTop: '3px',
+                        color: isCritical ? '#ff6b6b' : isWarning ? '#fbbf24' : '#34d399'
                       }}>
                         {riskStr}
                       </div>
@@ -1629,7 +1638,7 @@ function LiveMapView() {
                       </div>
                     </div>
                   </Popup>
-                </Circle>
+                </Polygon>
               );
             })}
 
