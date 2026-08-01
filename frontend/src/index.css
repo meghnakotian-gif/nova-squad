@@ -1252,6 +1252,115 @@ body {
   display: none !important;
 }
 
+/* Navbar Language Selector Dropdown */
+.language-selector-dropdown {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.language-selector-dropdown:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--color-primary);
+}
+.language-selector-dropdown option {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+/* Theme Switcher Dropdown */
+.theme-switcher-dropdown {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.theme-switcher-dropdown:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-primary);
+}
+.theme-switcher-dropdown option {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+/* Light Theme Overrides for Dashboard */
+.dashboard-theme-light {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  padding: 16px;
+  border-radius: 12px;
+}
+.dashboard-theme-light .panel {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+  color: #0f172a !important;
+}
+.dashboard-theme-light .panel-title,
+.dashboard-theme-light h2,
+.dashboard-theme-light h3,
+.dashboard-theme-light strong {
+  color: #0f172a !important;
+}
+.dashboard-theme-light .telemetry-card {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+.dashboard-theme-light .card-value {
+  color: #0284c7 !important;
+}
+.dashboard-theme-light .theme-switcher-dropdown {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+.dashboard-theme-light .theme-switcher-dropdown option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+/* Ocean Blue Theme Overrides for Dashboard */
+.dashboard-theme-ocean {
+  background: #0b192c !important;
+  color: #e2e8f0 !important;
+  padding: 16px;
+  border-radius: 12px;
+}
+.dashboard-theme-ocean .panel {
+  background: #1e3e62 !important;
+  border: 1px solid #008dda !important;
+  box-shadow: 0 4px 20px rgba(0, 141, 218, 0.2) !important;
+  color: #ffffff !important;
+}
+.dashboard-theme-ocean .panel-title,
+.dashboard-theme-ocean h2,
+.dashboard-theme-ocean h3,
+.dashboard-theme-ocean strong {
+  color: #38bdf8 !important;
+}
+.dashboard-theme-ocean .telemetry-card {
+  background: #001f3f !important;
+  border: 1px solid #38bdf8 !important;
+  color: #ffffff !important;
+}
+.dashboard-theme-ocean .card-value {
+  color: #38bdf8 !important;
+}
+
 /* Navbar Notifications Dropdown & Bell Button */
 .notification-bell-btn {
   background: rgba(255, 255, 255, 0.08);

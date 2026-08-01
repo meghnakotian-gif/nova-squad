@@ -32,6 +32,9 @@ import {
 // Base URL for the Flask backend API
 const BACKEND_URL = 'https://nova-squad-backend.onrender.com';
 
+// Import translation dictionary for multi-language support (English, Kannada, Hindi, Tulu, Malayalam)
+import { translations } from './translations';
+
 // ==========================================
 // Helper function to format relative timestamps ("2 minutes ago", "Just now", etc.)
 function getTimeAgo(timestamp, timeRaw) {
@@ -58,7 +61,7 @@ function getTimeAgo(timestamp, timeRaw) {
 // ROOT COMPONENT WITH ROUTER
 // ==========================================
 
-function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead }) {
+function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead, lang, setLang, t }) {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -68,8 +71,8 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // Redirect successfully logged-out users to Login page
-      navigate("/login");
+      // Redirect successfully logged-out users to Home page
+      navigate("/");
     } catch (err) {
       console.error("Sign out process failed: ", err);
     }
@@ -90,7 +93,7 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
     <header className="app-header">
       <div className="brand-section">
         <h1>
-          🌊 Flood Pulse AI <span className="brand-badge">Engine v1.0</span>
+          🌊 {t.brand || "NOVA Flood Squad"} <span className="brand-badge">Engine v1.0</span>
         </h1>
       </div>
 
@@ -98,9 +101,30 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
         {/* Navigation Bar */}
         <nav className="navbar">
           <ul className="nav-list">
+            {/* Language Selector Dropdown (visible on all pages) */}
+            <li className="nav-item">
+              <select 
+                value={lang} 
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  setLang(selected);
+                  localStorage.setItem('appLanguage', selected);
+                }}
+                className="language-selector-dropdown"
+                title="Select Language"
+                aria-label="Select Language"
+              >
+                <option value="en">🌐 English</option>
+                <option value="kn">🌐 ಕನ್ನಡ (Kannada)</option>
+                <option value="hi">🌐 हिन्दी (Hindi)</option>
+                <option value="tcy">🌐 ತುಳು (Tulu)</option>
+                <option value="ml">🌐 മലയാളം (Malayalam)</option>
+              </select>
+            </li>
+
             <li className="nav-item">
               <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                Home
+                {t.home || 'Home'}
               </NavLink>
             </li>
             {/* Dynamic authentication state triggers */}
@@ -109,17 +133,17 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
                 <>
                   <li className="nav-item">
                     <NavLink to="/live-map" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                      Live Map
+                      {t.liveMap || 'Live Map'}
                     </NavLink>
                   </li>
                   <li className="nav-item">
                     <NavLink to="/report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                      Report Flood
+                      {t.reportFlood || 'Report Incident'}
                     </NavLink>
                   </li>
                   <li className="nav-item">
                     <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                      Dashboard
+                      {t.dashboard || 'Dashboard'}
                     </NavLink>
                   </li>
 
@@ -202,7 +226,7 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
                       onClick={handleLogout}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', outline: 'none' }}
                     >
-                      Logout
+                      {t.logout || 'Logout'}
                     </button>
                   </li>
                 </>
@@ -210,7 +234,7 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
                 <>
                   <li className="nav-item">
                     <NavLink to="/login" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                      Login
+                      {t.login || 'Login'}
                     </NavLink>
                   </li>
                   <li className="nav-item">
@@ -256,6 +280,10 @@ function App() {
   // Authentication session tracking states
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Multi-language localization state (persisted in localStorage, defaults to English)
+  const [lang, setLang] = useState(() => localStorage.getItem('appLanguage') || 'en');
+  const t = translations[lang] || translations.en;
 
   // Emergency Alerts active states
   const [activeAlert, setActiveAlert] = useState(null);
@@ -470,15 +498,17 @@ function App() {
 
   return (
     <Router>
-      {/* Header and Navbar containing useNavigate must be a child of Router */}
       <HeaderNavbar 
-        backendHealthy={backendHealthy}
-        currentUser={currentUser}
+        backendHealthy={backendHealthy} 
+        currentUser={currentUser} 
         authLoading={authLoading}
         notifications={notifications}
         readIds={readNotificationIds}
         onMarkRead={handleMarkRead}
         onMarkAllRead={handleMarkAllRead}
+        lang={lang}
+        setLang={setLang}
+        t={t}
       />
 
       {/* Global Emergency Alert Banner */}
@@ -504,7 +534,7 @@ function App() {
         <Route path="/" element={<HomeView />} />
         <Route path="/live-map" element={
           <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
-            <LiveMapView />
+            <LiveMapView t={t} />
           </ProtectedRoute>
         } />
         <Route path="/report" element={
@@ -1252,7 +1282,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-function LiveMapView() {
+function LiveMapView({ t = translations.en }) {
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState(null);
@@ -1740,19 +1770,19 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
         
         {/* Route Search Panel */}
         <div className="panel" style={{ marginBottom: '16px' }}>
-          <h3 className="panel-title" style={{ marginBottom: '16px' }}>🗺️ Safe Route Finder</h3>
+          <h3 className="panel-title" style={{ marginBottom: '16px' }}>🗺️ {t.findSafeRoute || 'Find Safe Route'}</h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Location</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.currentLocation || 'Current Location'}</label>
                 <button onClick={handleUseMyLocation} disabled={isLocating} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '11px', cursor: isLocating ? 'not-allowed' : 'pointer', opacity: isLocating ? 0.5 : 1 }}>
-                  {isLocating ? '⏳ Locating...' : 'Use GPS'}
+                  {isLocating ? '⏳ Locating...' : (t.useGps || 'Use GPS')}
                 </button>
               </div>
               <input 
                 type="text" 
-                placeholder="Enter start location..." 
+                placeholder={t.enterStartLocation || "Enter start location..."}
                 value={startInput}
                 onChange={(e) => {
                   setStartInput(e.target.value);
@@ -1763,10 +1793,10 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
             </div>
             
             <div>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Destination</label>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t.destination || 'Destination'}</label>
               <input 
                 type="text" 
-                placeholder="Enter destination address..." 
+                placeholder={t.enterDestinationAddress || "Enter destination address..."}
                 value={destInput}
                 onChange={(e) => setDestInput(e.target.value)}
                 style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--border-muted)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} 
@@ -1778,7 +1808,7 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
               disabled={routeLoading || !destInput || !startInput}
               style={{ width: '100%', padding: '10px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
             >
-              {routeLoading ? 'Calculating...' : 'Find Safe Route'}
+              {routeLoading ? (t.searchRouteLoading || 'Calculating...') : (t.searchRouteBtn || 'Find Safe Route')}
             </button>
             
             {routeError && (
@@ -1839,6 +1869,9 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
 // ==========================================
 
 function DashboardView({ backendHealthy }) {
+  // Theme switcher state (Dark Space default, Light Mode, Ocean Blue)
+  const [dashboardTheme, setDashboardTheme] = useState(() => localStorage.getItem('dashboardTheme') || 'dark');
+
   // Current telemetry readings from the river basin sensors
   const [telemetry, setTelemetry] = useState({
     water_level_m: 4.85,
@@ -2079,16 +2112,6 @@ function DashboardView({ backendHealthy }) {
 
       setSimOutput(fallbackData);
       setHasPredicted(true);
-
-      // Save fallback prediction result to Cloud Firestore
-      await savePredictionToFirestore(
-        fallbackData.zone_name, 
-        simInputs.rainfall_mm, 
-        simInputs.water_level_m, 
-        fallbackData.risk, 
-        fallbackData.confidence
-      );
-
       // If standalone fallback yields a CRITICAL risk, log an emergency alert to Firestore alerts collection
       if (calculatedRisk === 'CRITICAL') {
         try {
@@ -2129,133 +2152,151 @@ function DashboardView({ backendHealthy }) {
   const waveYCoord = baseWaterLevelHeight - (percentageFilled * baseWaterLevelHeight / 100);
 
   return (
-    <main className="dashboard-grid">
-      {/* Left Side: Sensor Telemetry Widget */}
-      <section className="panel pulsing-glow">
-        <div className="panel-header">
-          <h2 className="panel-title">📡 Real-Time Hydrology Telemetry</h2>
-          <button 
-            className="btn btn-secondary" 
-            onClick={fetchTelemetry}
-            disabled={loadingTelemetry}
-          >
-            {loadingTelemetry ? 'Refreshing Sensors...' : '🔄 Poll Sensors'}
-          </button>
-        </div>
+    <div className={`dashboard-container dashboard-theme-${dashboardTheme}`} style={{ transition: 'all 0.3s ease' }}>
+      {/* Theme Switcher Header Controls */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <span style={{ fontSize: '12.5px', fontWeight: 'bold', opacity: 0.85 }}>🎨 Dashboard Theme:</span>
+        <select 
+          value={dashboardTheme} 
+          onChange={(e) => {
+            const selected = e.target.value;
+            setDashboardTheme(selected);
+            localStorage.setItem('dashboardTheme', selected);
+          }}
+          className="theme-switcher-dropdown"
+          title="Select Dashboard Theme"
+          aria-label="Select Dashboard Theme"
+        >
+          <option value="dark">🌙 Dark Space (Default)</option>
+          <option value="light">☀️ Light Mode</option>
+          <option value="ocean">🌊 Ocean Blue</option>
+        </select>
+      </div>
 
-        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
-          Telemetry readings from <strong>{telemetry.station}</strong>.
-        </p>
-
-        {/* Telemetry Gauge Cards */}
-        <div className="telemetry-grid">
-          <div className="telemetry-card">
-            <div className="card-label">Water Level</div>
-            <div className="card-value">
-              {telemetry.water_level_m} <span className="card-unit">m</span>
-            </div>
+      <main className="dashboard-grid">
+        {/* Left Side: Sensor Telemetry Widget */}
+        <section className="panel pulsing-glow">
+          <div className="panel-header">
+            <h2 className="panel-title">📡 Real-Time Hydrology Telemetry</h2>
+            <button 
+              className="btn btn-secondary" 
+              onClick={fetchTelemetry}
+              disabled={loadingTelemetry}
+            >
+              {loadingTelemetry ? 'Refreshing Sensors...' : '🔄 Poll Sensors'}
+            </button>
           </div>
 
-          <div className="telemetry-card">
-            <div className="card-label">River Discharge</div>
-            <div className="card-value">
-              {telemetry.flow_rate_m3s} <span className="card-unit">m³/s</span>
-            </div>
-          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+            Telemetry readings from <strong>{telemetry.station}</strong>.
+          </p>
 
-          <div className="telemetry-card" style={{ position: 'relative' }}>
-            <div className="card-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Precipitation / Weather</span>
-              {liveWeather.isLive && (
-                <span className="live-badge" style={{
-                  fontSize: '9px',
-                  background: 'rgba(0, 176, 255, 0.2)',
-                  color: 'var(--color-primary)',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  border: '1px solid rgba(0, 176, 255, 0.3)',
-                  fontWeight: '700',
-                  letterSpacing: '0.5px'
-                }}>
-                  ● LIVE WEATHER
-                </span>
+          {/* Telemetry Gauge Cards */}
+          <div className="telemetry-grid">
+            <div className="telemetry-card">
+              <div className="card-label">Water Level</div>
+              <div className="card-value">
+                {telemetry.water_level_m} <span className="card-unit">m</span>
+              </div>
+            </div>
+
+            <div className="telemetry-card">
+              <div className="card-label">River Discharge</div>
+              <div className="card-value">
+                {telemetry.flow_rate_m3s} <span className="card-unit">m³/s</span>
+              </div>
+            </div>
+
+            <div className="telemetry-card" style={{ position: 'relative' }}>
+              <div className="card-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Precipitation / Weather</span>
+                {liveWeather.isLive && (
+                  <span className="live-badge" style={{
+                    fontSize: '9px',
+                    background: 'rgba(0, 176, 255, 0.2)',
+                    color: 'var(--color-primary)',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid rgba(0, 176, 255, 0.3)',
+                    fontWeight: '700',
+                    letterSpacing: '0.5px'
+                  }}>
+                    ● LIVE WEATHER
+                  </span>
+                )}
+              </div>
+              {liveWeather.isLive ? (
+                <div style={{ marginTop: '6px' }}>
+                  <div className="card-value" style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                    <span>{liveWeather.temp} <span className="card-unit">°C</span></span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400', textTransform: 'capitalize' }}>
+                      {liveWeather.description} ({liveWeather.locationName})
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                    <div>💧 Humid: <strong>{liveWeather.humidity}%</strong></div>
+                    <div>🌧️ Rain: <strong>{liveWeather.rainChance}%</strong></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="card-value">
+                  {telemetry.precipitation_mm} <span className="card-unit">mm</span>
+                </div>
               )}
             </div>
-            {liveWeather.isLive ? (
-              <div style={{ marginTop: '6px' }}>
-                <div className="card-value" style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                  <span>{liveWeather.temp} <span className="card-unit">°C</span></span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400', textTransform: 'capitalize' }}>
-                    {liveWeather.description} ({liveWeather.locationName})
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                  <div>💧 Humid: <strong>{liveWeather.humidity}%</strong></div>
-                  <div>🌧️ Rain: <strong>{liveWeather.rainChance}%</strong></div>
-                </div>
-              </div>
-            ) : (
-              <div className="card-value">
-                {telemetry.precipitation_mm} <span className="card-unit">mm</span>
-                <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '4px' }}>
-                  (Simulated Baseline)
-                </span>
-              </div>
-            )}
-          </div>
 
-          <div className="telemetry-card">
-            <div className="card-label">Soil Moisture</div>
-            <div className="card-value">
-              {telemetry.soil_moisture_pct} <span className="card-unit">%</span>
+            <div className="telemetry-card">
+              <div className="card-label">Soil Moisture</div>
+              <div className="card-value">
+                {telemetry.soil_moisture_pct} <span className="card-unit">%</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Hydrographic Visualizer Panel */}
-        <div className="visualizer-container">
-          <div className="sensor-node" style={{ left: '30%', bottom: `${Math.min(90, Math.max(10, percentageFilled))}%` }}></div>
-          <div className="sensor-node" style={{ left: '75%', bottom: `${Math.min(90, Math.max(10, percentageFilled - 5))}%` }}></div>
-          
-          <svg className="river-svg" preserveAspectRatio="none" viewBox="0 0 400 220">
-            <defs>
-              <linearGradient id="river-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(0, 176, 255, 0.75)" />
-                <stop offset="100%" stopColor="rgba(10, 12, 16, 0.95)" />
-              </linearGradient>
-            </defs>
+          {/* Hydrographic Visualizer Panel */}
+          <div className="visualizer-container">
+            <div className="sensor-node" style={{ left: '30%', bottom: `${Math.min(90, Math.max(10, percentageFilled))}%` }}></div>
+            <div className="sensor-node" style={{ left: '75%', bottom: `${Math.min(90, Math.max(10, percentageFilled - 5))}%` }}></div>
             
-            <path 
-              className="river-fill river-wave"
-              d={`M 0 ${waveYCoord} 
-                  Q 100 ${waveYCoord - 10}, 200 ${waveYCoord} 
-                  T 400 ${waveYCoord} 
-                  L 400 220 L 0 220 Z`}
-            />
-            <path 
-              className="river-fill"
-              opacity="0.4"
-              d={`M 0 ${waveYCoord + 8} 
-                  Q 120 ${waveYCoord - 2}, 240 ${waveYCoord + 5} 
-                  T 400 ${waveYCoord + 8} 
-                  L 400 220 L 0 220 Z`}
-            />
-          </svg>
-        </div>
-
-        {/* Active Hydrological Alerts Callout */}
-        <div className="alert-callout">
-          <span className={`alert-indicator ${telemetry.alert_status}`}>
-            {telemetry.alert_status}
-          </span>
-          <div className="alert-message">
-            <strong>System Status:</strong> {telemetry.alert_desc}
+            <svg className="river-svg" preserveAspectRatio="none" viewBox="0 0 400 220">
+              <defs>
+                <linearGradient id="river-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(0, 176, 255, 0.75)" />
+                  <stop offset="100%" stopColor="rgba(10, 12, 16, 0.95)" />
+                </linearGradient>
+              </defs>
+              
+              <path 
+                className="river-fill river-wave"
+                d={`M 0 ${waveYCoord} 
+                    Q 100 ${waveYCoord - 10}, 200 ${waveYCoord} 
+                    T 400 ${waveYCoord} 
+                    L 400 220 L 0 220 Z`}
+              />
+              <path 
+                className="river-fill"
+                opacity="0.4"
+                d={`M 0 ${waveYCoord + 8} 
+                    Q 120 ${waveYCoord - 2}, 240 ${waveYCoord + 5} 
+                    T 400 ${waveYCoord + 8} 
+                    L 400 220 L 0 220 Z`}
+              />
+            </svg>
           </div>
-        </div>
-      </section>
 
-      {/* Right Side: AI Flood Risk Simulator */}
-      <section className="panel">
+          {/* Active Hydrological Alerts Callout */}
+          <div className="alert-callout">
+            <span className={`alert-indicator ${telemetry.alert_status}`}>
+              {telemetry.alert_status}
+            </span>
+            <div className="alert-message">
+              <strong>System Status:</strong> {telemetry.alert_desc}
+            </div>
+          </div>
+        </section>
+
+        {/* Right Side: AI Flood Risk Simulator */}
+        <section className="panel">
         <h2 className="panel-title" style={{ marginBottom: '8px' }}>🧠 AI Prediction Simulator</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
           Simulate flood risk by invoking the AI predictive models.
@@ -2343,7 +2384,7 @@ function DashboardView({ backendHealthy }) {
               </span>
             </div>
 
-            <div className="prediction-stats" style={{ gridTemplateColumns: '1fr' }}>
+            <div className="prediction-stats" style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
               <div className="stat-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="stat-label" style={{ margin: 0 }}>Model Confidence</span>
                 <span className="stat-val" style={{ color: 'var(--color-primary)', fontWeight: '700' }}>{simOutput.confidence}%</span>
@@ -2353,6 +2394,7 @@ function DashboardView({ backendHealthy }) {
         )}
       </section>
     </main>
+    </div>
   );
 }
 
