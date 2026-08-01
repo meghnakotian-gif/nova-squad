@@ -107,9 +107,150 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
     <header className="app-header">
       <div className="brand-section">
         <div className="brand-title-row">
-          <h1>
-            🌊 {t.brand || "NOVA Flood Squad"} <span className="brand-badge">Engine v1.0</span>
-          </h1>
+          <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <h1>
+              🌊 {t.brand || "NOVA Flood Squad"} <span className="brand-badge">Engine v1.0</span>
+            </h1>
+          </Link>
+
+          {/* Quick Header Controls (Theme, Language, Helpline, Notification Bell) */}
+          <div className="header-quick-controls">
+            {/* Theme Selector Dropdown */}
+            <select 
+              value={appTheme} 
+              onChange={(e) => onThemeChange(e.target.value)}
+              className="theme-switcher-dropdown"
+              title="Select Theme"
+              aria-label="Select Theme"
+            >
+              <option value="dark">{t.themeDark || '🌙 Dark'}</option>
+              <option value="light">{t.themeLight || '☀️ Light'}</option>
+              <option value="ocean">{t.themeOcean || '🌊 Ocean'}</option>
+            </select>
+
+            {/* Language Selector Dropdown */}
+            <select 
+              value={lang} 
+              onChange={(e) => {
+                const selected = e.target.value;
+                setLang(selected);
+                localStorage.setItem('appLanguage', selected);
+              }}
+              className="language-selector-dropdown"
+              title="Select Language"
+              aria-label="Select Language"
+            >
+              <option value="en">🌐 English</option>
+              <option value="hi">🌐 हिन्दी</option>
+              <option value="kn">🌐 ಕನ್ನಡ</option>
+              <option value="ta">🌐 தமிழ்</option>
+              <option value="te">🌐 తెలుగు</option>
+              <option value="ml">🌐 മലയാളം</option>
+              <option value="mr">🌐 मराठी</option>
+              <option value="bn">🌐 বাংলা</option>
+              <option value="gu">🌐 ગુજરાતી</option>
+              <option value="pa">🌐 ਪੰਜਾਬੀ</option>
+              <option value="ur">🌐 اردو</option>
+              <option value="or">🌐 ଓଡ଼ିଆ</option>
+              <option value="as">🌐 অসমীয়া</option>
+              <option value="tcy">🌐 ತುಳು</option>
+              <option value="kok">🌐 ಕೊಂಕಣಿ</option>
+            </select>
+
+            {/* Disaster Helpline Button */}
+            <a 
+              href="tel:1077"
+              className="sos-navbar-btn"
+              title="Call Disaster Management Helpline (1077)"
+              aria-label="Call Disaster Management Helpline (1077)"
+              style={{
+                background: 'linear-gradient(135deg, #ff3e3e, #ff5722)',
+                color: '#ffffff',
+                padding: '5px 12px',
+                borderRadius: '20px',
+                fontWeight: '800',
+                fontSize: '12px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 0 14px rgba(255, 62, 62, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                letterSpacing: '0.3px',
+                cursor: 'pointer'
+              }}
+            >
+              📞 {t.sosButton || 'Helpline 1077'}
+            </a>
+
+            {/* Notification Bell Icon & Dropdown */}
+            <div style={{ position: 'relative' }} ref={dropdownRef}>
+              <button 
+                className="notification-bell-btn"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                title="Notifications"
+                aria-label="Notifications"
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
+              </button>
+
+              {dropdownOpen && (
+                <div className="notification-dropdown">
+                  <div className="notification-header">
+                    <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-bright)' }}>
+                      Notifications {unreadCount > 0 && <span style={{ opacity: 0.7 }}>({unreadCount} unread)</span>}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button 
+                        className="mark-all-btn"
+                        onClick={onMarkAllRead}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="notification-list">
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map(item => {
+                        const isUnread = !readIds.has(item.id);
+                        const isReport = item.type === 'New Report';
+                        return (
+                          <div 
+                            key={item.id} 
+                            className={`notification-item ${isUnread ? 'unread' : ''}`}
+                            onClick={() => onMarkRead(item.id)}
+                          >
+                            <div className="notification-item-header">
+                              <span className={`notification-tag ${isReport ? 'report-tag' : 'alert-tag'}`}>
+                                {isReport ? '📝 New Report' : '🚨 Alert'}
+                              </span>
+                              <span className="notification-time">
+                                {getTimeAgo(item.timestamp, item.timeRaw)}
+                              </span>
+                            </div>
+                            <div className="notification-location">
+                              📍 {item.location}
+                            </div>
+                            <div className="notification-details">
+                              {item.severity ? `Severity: ${item.severity.toUpperCase()}` : ''} {item.details ? `— ${item.details}` : ''}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -117,80 +258,6 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
         {/* Navigation Bar */}
         <nav className="navbar">
           <ul className="nav-list">
-            {/* Theme Selector Dropdown (visible on all pages) */}
-            <li className="nav-item">
-              <select 
-                value={appTheme} 
-                onChange={(e) => onThemeChange(e.target.value)}
-                className="theme-switcher-dropdown"
-                title="Select Theme"
-                aria-label="Select Theme"
-              >
-                <option value="dark">{t.themeDark || '🌙 Dark Space'}</option>
-                <option value="light">{t.themeLight || '☀️ Light Mode'}</option>
-                <option value="ocean">{t.themeOcean || '🌊 Ocean Blue'}</option>
-              </select>
-            </li>
-
-            {/* Language Selector Dropdown (visible on all pages) */}
-            <li className="nav-item">
-              <select 
-                value={lang} 
-                onChange={(e) => {
-                  const selected = e.target.value;
-                  setLang(selected);
-                  localStorage.setItem('appLanguage', selected);
-                }}
-                className="language-selector-dropdown"
-                title="Select Language"
-                aria-label="Select Language"
-              >
-                <option value="en">🌐 English</option>
-                <option value="hi">🌐 हिन्दी (Hindi)</option>
-                <option value="kn">🌐 ಕನ್ನಡ (Kannada)</option>
-                <option value="ta">🌐 தமிழ் (Tamil)</option>
-                <option value="te">🌐 తెలుగు (Telugu)</option>
-                <option value="ml">🌐 മലയാളം (Malayalam)</option>
-                <option value="mr">🌐 मराठी (Marathi)</option>
-                <option value="bn">🌐 বাংলা (Bengali)</option>
-                <option value="gu">🌐 ગુજરાતી (Gujarati)</option>
-                <option value="pa">🌐 ਪੰਜਾਬੀ (Punjabi)</option>
-                <option value="ur">🌐 اردو (Urdu)</option>
-                <option value="or">🌐 ଓଡ଼ିଆ (Odia)</option>
-                <option value="as">🌐 অসমীয়া (Assamese)</option>
-                <option value="tcy">🌐 ತುಳು (Tulu)</option>
-                <option value="kok">🌐 ಕೊಂಕಣಿ (Konkani)</option>
-              </select>
-            </li>
-
-            {/* Disaster Helpline Button (visible on all pages) */}
-            <li className="nav-item">
-              <a 
-                href="tel:1077"
-                className="sos-navbar-btn"
-                title="Call Disaster Management Helpline (1077)"
-                aria-label="Call Disaster Management Helpline (1077)"
-                style={{
-                  background: 'linear-gradient(135deg, #ff3e3e, #ff5722)',
-                  color: '#ffffff',
-                  padding: '5px 13px',
-                  borderRadius: '20px',
-                  fontWeight: '800',
-                  fontSize: '12px',
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 0 14px rgba(255, 62, 62, 0.5)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  letterSpacing: '0.3px',
-                  cursor: 'pointer'
-                }}
-              >
-                📞 {t.sosButton || 'Helpline 1077'}
-              </a>
-            </li>
-
             <li className="nav-item">
               <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 {t.home || 'Home'}
@@ -214,74 +281,6 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
                     <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                       {t.dashboard || 'Dashboard'}
                     </NavLink>
-                  </li>
-
-                  {/* Bell Icon with Unread Count Badge & Dropdown */}
-                  <li className="nav-item" style={{ position: 'relative' }} ref={dropdownRef}>
-                    <button 
-                      className="notification-bell-btn"
-                      onClick={() => setDropdownOpen(!dropdownOpen)}
-                      title="Notifications"
-                      aria-label="Notifications"
-                    >
-                      🔔
-                      {unreadCount > 0 && (
-                        <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
-                      )}
-                    </button>
-
-                    {dropdownOpen && (
-                      <div className="notification-dropdown">
-                        <div className="notification-header">
-                          <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-bright)' }}>
-                            Notifications {unreadCount > 0 && <span style={{ opacity: 0.7 }}>({unreadCount} unread)</span>}
-                          </div>
-                          {unreadCount > 0 && (
-                            <button 
-                              className="mark-all-btn"
-                              onClick={onMarkAllRead}
-                            >
-                              Mark all as read
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="notification-list">
-                          {notifications.length === 0 ? (
-                            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                              No notifications yet
-                            </div>
-                          ) : (
-                            notifications.map(item => {
-                              const isUnread = !readIds.has(item.id);
-                              const isReport = item.type === 'New Report';
-                              return (
-                                <div 
-                                  key={item.id} 
-                                  className={`notification-item ${isUnread ? 'unread' : ''}`}
-                                  onClick={() => onMarkRead(item.id)}
-                                >
-                                  <div className="notification-item-header">
-                                    <span className={`notification-tag ${isReport ? 'report-tag' : 'alert-tag'}`}>
-                                      {isReport ? '📝 New Report' : '🚨 Alert'}
-                                    </span>
-                                    <span className="notification-time">
-                                      {getTimeAgo(item.timestamp, item.timeRaw)}
-                                    </span>
-                                  </div>
-                                  <div className="notification-location">
-                                    📍 {item.location}
-                                  </div>
-                                  <div className="notification-details">
-                                    {item.severity ? `Severity: ${item.severity.toUpperCase()}` : ''} {item.details ? `— ${item.details}` : ''}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </li>
 
                   <li className="nav-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

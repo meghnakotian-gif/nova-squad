@@ -1221,22 +1221,45 @@ body {
   color: var(--text-bright) !important;
 }
 
-/* Hide mobile header actions on desktop */
-.mobile-header-actions {
-  display: none;
+/* Header Quick Controls Bar (Language, Notification Bell, Theme, Helpline) */
+.header-quick-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.language-selector-dropdown,
+.theme-switcher-dropdown {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-muted);
+  border-radius: 8px;
+  color: var(--text-bright);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.language-selector-dropdown:hover,
+.theme-switcher-dropdown:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--color-primary);
+}
+
+.language-selector-dropdown option,
+.theme-switcher-dropdown option {
+  background: #12161f;
+  color: #ffffff;
 }
 
 /* Mobile responsiveness adjustments (screens under 768px) */
 @media (max-width: 767px) {
-  /* Hide desktop top nav links */
-  .app-header .navbar {
-    display: none;
-  }
-
-  /* Header breathing room & compact top title row on mobile */
   .app-header {
-    padding: 8px 0 20px 0;
-    margin-bottom: 24px;
+    padding: 10px 0 16px 0;
+    margin-bottom: 20px;
     gap: 12px;
   }
 
@@ -1246,57 +1269,103 @@ body {
     align-items: center;
     width: 100%;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .brand-section h1 {
-    font-size: 20px !important;
+    font-size: 17px !important;
     gap: 6px !important;
   }
 
   .brand-badge {
-    font-size: 9px !important;
-    padding: 2px 6px !important;
+    font-size: 8.5px !important;
+    padding: 2px 5px !important;
   }
 
-  .mobile-header-actions {
+  .header-quick-controls {
     display: flex !important;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
-  .mobile-lang-select {
-    padding: 4px 8px !important;
-    font-size: 11.5px !important;
+  .language-selector-dropdown {
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    max-width: 96px;
     border-radius: 8px !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    outline: none;
-    color: #ffffff;
-    cursor: pointer;
   }
 
-  .mobile-bell-btn {
-    width: 34px !important;
-    height: 34px !important;
-    font-size: 15px !important;
-    border-radius: 50% !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  .theme-switcher-dropdown {
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    max-width: 86px;
+    border-radius: 8px !important;
   }
 
-  .mobile-notification-dropdown {
+  .sos-navbar-btn {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    border-radius: 16px !important;
+  }
+
+  .notification-bell-btn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .notification-dropdown {
     position: fixed !important;
-    top: 68px !important;
+    top: 64px !important;
     left: 12px !important;
     right: 12px !important;
     width: auto !important;
-    max-height: 400px !important;
+    max-height: 420px !important;
     z-index: 10000 !important;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85) !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
   }
 
-  /* Make mobile bottom nav visible & native-feeling */
+  .header-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .app-header .navbar {
+    display: flex !important;
+    width: 100%;
+    overflow-x: auto;
+    padding: 4px;
+    background: rgba(20, 24, 33, 0.8);
+    border-radius: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-list {
+    display: flex;
+    width: 100%;
+    justify-content: space-around;
+    gap: 4px;
+  }
+
+  .nav-link {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+  }
+
+  .status-badge {
+    align-self: flex-start;
+    font-size: 11px !important;
+    padding: 4px 10px !important;
+  }
+
   .mobile-navbar {
     display: flex !important;
     position: fixed;
