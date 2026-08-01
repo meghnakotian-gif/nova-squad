@@ -920,9 +920,72 @@ function DashboardView({ backendHealthy }) {
   // Track Firestore save state
   const [firestoreSaved, setFirestoreSaved] = useState(false);
 
+  // OpenWeatherMap Live Weather states
+  const [liveWeather, setLiveWeather] = useState({
+    isLive: false,
+    temp: null,
+    humidity: null,
+    rainChance: null,
+    description: "",
+    locationName: "Bengaluru"
+  });
+
+  const fetchLiveWeather = async () => {
+    const apiKey = "a770b95390e72d4ac82fab668028f53a";
+    let url = `https://api.openweathermap.org/data/2.5/weather?q=Bengaluru,IN&units=metric&appid=${apiKey}`;
+    let locationName = "Bengaluru, India";
+
+    try {
+      if (navigator.geolocation) {
+        // Geolocation promise wrapper with timeout to prevent infinite blocking
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 6000 });
+        });
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+        locationName = "Your Coordinates";
+      }
+    } catch (geoError) {
+      console.warn("Geolocation prompt skipped or rejected. Falling back to default Bengaluru, India weather metrics.", geoError);
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("OpenWeatherMap response error");
+      const data = await response.json();
+      
+      const weatherMain = data.weather?.[0]?.main || "";
+      const cloudiness = data.clouds?.all || 0;
+      let calculatedRainChance = 0;
+
+      // Estimate rain chance/probability dynamically based on OpenWeatherMap cloud coverage and state values
+      if (['Rain', 'Drizzle', 'Thunderstorm'].includes(weatherMain)) {
+        calculatedRainChance = weatherMain === 'Rain' ? 95 : weatherMain === 'Thunderstorm' ? 98 : 85;
+      } else if (weatherMain === 'Clouds') {
+        calculatedRainChance = Math.min(90, Math.round(cloudiness * 0.7));
+      } else {
+        calculatedRainChance = Math.min(50, Math.round(cloudiness * 0.25));
+      }
+
+      setLiveWeather({
+        isLive: true,
+        temp: Math.round(data.main.temp * 10) / 10,
+        humidity: data.main.humidity,
+        rainChance: calculatedRainChance,
+        description: data.weather?.[0]?.description || "cloudy",
+        locationName: data.name || locationName
+      });
+    } catch (apiError) {
+      console.error("Live weather api error, falling back to simulated telemetry: ", apiError);
+      setLiveWeather(prev => ({ ...prev, isLive: false }));
+    }
+  };
+
   // Fetch updated telemetry from backend
   const fetchTelemetry = async () => {
     setLoadingTelemetry(true);
+    fetchLiveWeather(); // Parallel update live weather data
     try {
       const response = await fetch(`${BACKEND_URL}/api/telemetry`);
       if (response.ok) {
@@ -948,15 +1011,15 @@ function DashboardView({ backendHealthy }) {
       setTelemetry({
         water_level_m: waterLevel,
         flow_rate_m3s: +(waterLevel * 180.5 + (Math.random() * 20 - 10)).toFixed(1),
-        precipitation_mm: +(Math.random() * 50).toFixed(1),
-        soil_moisture_pct: +(40 + Math.random() * 55).toFixed(1),
-        humidity_pct: +(70 + Math.random() * 29).toFixed(1),
-        station: "Amazon Basin Gauging Station #12 (Offline)",
+        precipitation_mm: +(Math.random() * 32.4).toFixed(1),
+        soil_moisture_pct: +(50.0 + Math.random() * 40.0).toFixed(1),
+        humidity_pct: +(65.0 + Math.random() * 30.0).toFixed(1),
+        station: "Mock River basin sensors v1",
         alert_status: isCritical ? "CRITICAL" : isWarning ? "WARNING" : "NORMAL",
         alert_desc: isCritical 
-          ? "Water levels exceed critical flood line. Evacuation recommended." 
+          ? "CRITICAL swelling detected. Immediate flooding danger!" 
           : isWarning 
-            ? "Elevated water levels. Monitoring river pulses closely." 
+            ? "WARNING swelling alert. High water level baseline threshold breached." 
             : "River levels within historical baseline bounds."
       });
     } finally {
@@ -1094,6 +1157,7 @@ function DashboardView({ backendHealthy }) {
 
   useEffect(() => {
     fetchTelemetry();
+    fetchLiveWeather();
   }, []);
 
   const handleInputChange = (field, value) => {
@@ -1145,11 +1209,45 @@ function DashboardView({ backendHealthy }) {
             </div>
           </div>
 
-          <div className="telemetry-card">
-            <div className="card-label">Precipitation</div>
-            <div className="card-value">
-              {telemetry.precipitation_mm} <span className="card-unit">mm</span>
+          <div className="telemetry-card" style={{ position: 'relative' }}>
+            <div className="card-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Precipitation / Weather</span>
+              {liveWeather.isLive && (
+                <span className="live-badge" style={{
+                  fontSize: '9px',
+                  background: 'rgba(0, 176, 255, 0.2)',
+                  color: 'var(--color-primary)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(0, 176, 255, 0.3)',
+                  fontWeight: '700',
+                  letterSpacing: '0.5px'
+                }}>
+                  ● LIVE WEATHER
+                </span>
+              )}
             </div>
+            {liveWeather.isLive ? (
+              <div style={{ marginTop: '6px' }}>
+                <div className="card-value" style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>{liveWeather.temp} <span className="card-unit">°C</span></span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400', textTransform: 'capitalize' }}>
+                    {liveWeather.description} ({liveWeather.locationName})
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  <div>💧 Humid: <strong>{liveWeather.humidity}%</strong></div>
+                  <div>🌧️ Rain: <strong>{liveWeather.rainChance}%</strong></div>
+                </div>
+              </div>
+            ) : (
+              <div className="card-value">
+                {telemetry.precipitation_mm} <span className="card-unit">mm</span>
+                <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '4px' }}>
+                  (Simulated Baseline)
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="telemetry-card">
