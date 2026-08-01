@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Link, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
 
 // Import Leaflet & React-Leaflet packages for interactive mapping
@@ -64,26 +64,25 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading }) {
                 Home
               </NavLink>
             </li>
-            <li className="nav-item">
-              <NavLink to="/live-map" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                Live Map
-              </NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink to="/report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                Report Flood
-              </NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                Dashboard
-              </NavLink>
-            </li>
-            
             {/* Dynamic authentication state triggers */}
             {!authLoading && (
               currentUser ? (
                 <>
+                  <li className="nav-item">
+                    <NavLink to="/live-map" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                      Live Map
+                    </NavLink>
+                  </li>
+                  <li className="nav-item">
+                    <NavLink to="/report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                      Report Flood
+                    </NavLink>
+                  </li>
+                  <li className="nav-item">
+                    <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                      Dashboard
+                    </NavLink>
+                  </li>
                   <li className="nav-item" style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="user-email-badge" style={{ margin: '0 8px' }}>
                       👤 {currentUser.email}
@@ -127,6 +126,19 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading }) {
       </div>
     </header>
   );
+}
+
+// ==========================================
+// PROTECTED ROUTE COMPONENT
+// ==========================================
+function ProtectedRoute({ currentUser, authLoading, children }) {
+  if (authLoading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>Loading session...</div>;
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
 }
 
 function App() {
@@ -260,9 +272,21 @@ function App() {
       {/* Routed Pages Area */}
       <Routes>
         <Route path="/" element={<HomeView />} />
-        <Route path="/live-map" element={<LiveMapView />} />
-        <Route path="/report" element={<ReportFloodView />} />
-        <Route path="/dashboard" element={<DashboardView backendHealthy={backendHealthy} />} />
+        <Route path="/live-map" element={
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
+            <LiveMapView />
+          </ProtectedRoute>
+        } />
+        <Route path="/report" element={
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
+            <ReportFloodView />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
+            <DashboardView backendHealthy={backendHealthy} />
+          </ProtectedRoute>
+        } />
         <Route path="/login" element={<LoginView />} />
         <Route path="/signup" element={<SignupView />} />
       </Routes>
@@ -281,28 +305,36 @@ function App() {
             <span className="mobile-nav-icon">🏠</span>
             <span>Home</span>
           </NavLink>
-          <NavLink to="/live-map" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">🗺️</span>
-            <span>Live Map</span>
-          </NavLink>
-          <NavLink to="/report" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">📝</span>
-            <span>Report</span>
-          </NavLink>
-          <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">📊</span>
-            <span>Dashboard</span>
-          </NavLink>
           {currentUser ? (
-            <Link to="/login" onClick={() => signOut(auth)} className="mobile-nav-item">
-              <span className="mobile-nav-icon">🔓</span>
-              <span>Logout</span>
-            </Link>
+            <>
+              <NavLink to="/live-map" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                <span className="mobile-nav-icon">🗺️</span>
+                <span>Live Map</span>
+              </NavLink>
+              <NavLink to="/report" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                <span className="mobile-nav-icon">📝</span>
+                <span>Report</span>
+              </NavLink>
+              <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                <span className="mobile-nav-icon">📊</span>
+                <span>Dashboard</span>
+              </NavLink>
+              <Link to="/login" onClick={() => signOut(auth)} className="mobile-nav-item">
+                <span className="mobile-nav-icon">🔓</span>
+                <span>Logout</span>
+              </Link>
+            </>
           ) : (
-            <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-              <span className="mobile-nav-icon">👤</span>
-              <span>Login</span>
-            </NavLink>
+            <>
+              <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                <span className="mobile-nav-icon">👤</span>
+                <span>Login</span>
+              </NavLink>
+              <NavLink to="/signup" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                <span className="mobile-nav-icon">📝</span>
+                <span>Signup</span>
+              </NavLink>
+            </>
           )}
         </nav>
       )}
