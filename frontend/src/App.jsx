@@ -17,6 +17,7 @@ import {
   setDoc, 
   addDoc, 
   updateDoc,
+  deleteDoc,
   serverTimestamp, 
   query, 
   orderBy, 
@@ -691,7 +692,7 @@ function App() {
         } />
         <Route path="/report" element={
           <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
-            <ReportFloodView t={t} />
+            <ReportFloodView currentUser={currentUser} userRole={userRole} t={t} />
           </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
@@ -1041,7 +1042,7 @@ function HomeView({ t = translations.en }) {
 // REPORT FLOOD VIEW (Sightings Form Layout)
 // ==========================================
 
-function ReportFloodView({ currentUser, t = translations.en }) {
+function ReportFloodView({ currentUser, userRole, t = translations.en }) {
   const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1052,6 +1053,86 @@ function ReportFloodView({ currentUser, t = translations.en }) {
   const [uploadError, setUploadError] = useState("");
   const [allReports, setAllReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(true);
+
+  // Month filter state (Authority users default to current month YYYY-MM)
+  const getMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const value = `${year}-${month}`;
+      const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      options.push({ value, label });
+    }
+    options.push({ value: 'ALL', label: 'All Months' });
+    return options;
+  };
+
+  const currentMonthKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey());
+  const monthOptions = getMonthOptions();
+
+  // Helper to extract "YYYY-MM" key from Firestore timestamp
+  const getReportMonthKey = (timestamp) => {
+    if (!timestamp) return null;
+    let d = new Date();
+    if (timestamp.toMillis) d = new Date(timestamp.toMillis());
+    else if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
+    else if (timestamp instanceof Date) d = timestamp;
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+
+  // Selected report document IDs for bulk authority management
+  const [selectedReportIds, setSelectedReportIds] = useState([]);
+
+  // Toggle individual report checkbox selection
+  const handleToggleSelectReport = (reportId) => {
+    setSelectedReportIds(prev => 
+      prev.includes(reportId) ? prev.filter(id => id !== reportId) : [...prev, reportId]
+    );
+  };
+
+  // Toggle "Select All" currently displayed reports
+  const handleToggleSelectAll = () => {
+    const displayedIds = displayedReports.map(r => r.id);
+    const allSelected = displayedIds.length > 0 && displayedIds.every(id => selectedReportIds.includes(id));
+    if (allSelected) {
+      setSelectedReportIds(prev => prev.filter(id => !displayedIds.includes(id)));
+    } else {
+      setSelectedReportIds(prev => Array.from(new Set([...prev, ...displayedIds])));
+    }
+  };
+
+  // Bulk delete selected reports handler for authority users
+  const handleDeleteSelectedReports = async () => {
+    const count = selectedReportIds.length;
+    if (count === 0) return;
+
+    const confirmDelete = window.confirm(`Are you sure you want to delete ${count} selected incident report(s)?`);
+    if (!confirmDelete) return;
+
+    try {
+      await Promise.all(selectedReportIds.map(reportId => deleteDoc(doc(db, 'citizen_reports', reportId))));
+      setSelectedReportIds([]);
+    } catch (err) {
+      console.error("Error deleting selected report docs from Firestore:", err);
+      alert("Failed to delete selected reports. Please verify connection and try again.");
+    }
+  };
+
+  // Filter reports if authority user has selected a specific month
+  const displayedReports = (userRole === 'authority' && selectedMonth !== 'ALL')
+    ? allReports.filter(r => getReportMonthKey(r.timestamp) === selectedMonth)
+    : allReports;
 
   const [formData, setFormData] = useState({
     location: "",
@@ -1373,43 +1454,128 @@ function ReportFloodView({ currentUser, t = translations.en }) {
 
       {/* Full List of ALL Reports from ALL Users */}
       <section style={{ marginTop: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-bright)' }}>
-            📋 {t.allIncidentReports || 'Community Incident Feed'} ({allReports.length})
+            📋 {t.allIncidentReports || 'Community Incident Feed'} ({displayedReports.length})
           </h3>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            {reportsLoading ? 'Syncing reports...' : 'Real-time updates'}
-          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Authority Multi-Select & Bulk Delete Controls */}
+            {userRole === 'authority' && displayedReports.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255, 255, 255, 0.03)', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-bright)', cursor: 'pointer', fontWeight: '600', userSelect: 'none' }}>
+                  <input 
+                    type="checkbox"
+                    checked={displayedReports.length > 0 && displayedReports.every(r => selectedReportIds.includes(r.id))}
+                    onChange={handleToggleSelectAll}
+                    style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--color-primary)' }}
+                  />
+                  Select All
+                </label>
+
+                <button
+                  onClick={handleDeleteSelectedReports}
+                  disabled={selectedReportIds.length === 0}
+                  title={selectedReportIds.length === 0 ? "Select reports to enable deletion" : `Delete ${selectedReportIds.length} selected report(s)`}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    color: selectedReportIds.length > 0 ? '#ff5252' : 'var(--text-muted)',
+                    border: `1px solid ${selectedReportIds.length > 0 ? 'rgba(255, 82, 82, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    background: selectedReportIds.length > 0 ? 'rgba(255, 82, 82, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '6px',
+                    cursor: selectedReportIds.length > 0 ? 'pointer' : 'not-allowed',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    opacity: selectedReportIds.length > 0 ? 1 : 0.5,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  🗑️ Delete Selected {selectedReportIds.length > 0 ? `(${selectedReportIds.length})` : ''}
+                </button>
+              </div>
+            )}
+
+            {/* Month Filter Dropdown (Authority Role Only) */}
+            {userRole === 'authority' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>📅 Month:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    setSelectedMonth(e.target.value);
+                    setSelectedReportIds([]); // Clear selection when changing month filter
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--color-primary)',
+                    borderRadius: '8px',
+                    color: 'var(--text-bright)',
+                    padding: '6px 12px',
+                    fontSize: '12.5px',
+                    fontWeight: '600',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                  title="Filter reports by month"
+                >
+                  {monthOptions.map(opt => (
+                    <option key={opt.value} value={opt.value} style={{ background: '#12161f', color: '#fff' }}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {reportsLoading ? 'Syncing reports...' : 'Real-time updates'}
+            </span>
+          </div>
         </div>
 
         {reportsLoading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
             Loading community report feed...
           </div>
-        ) : allReports.length === 0 ? (
+        ) : displayedReports.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
-            No incident reports submitted yet. Click <strong>➕ New Report</strong> above to be the first!
+            No incident reports found for this period. Click <strong>➕ New Report</strong> above to log a sighting!
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {allReports.map((report) => {
+            {displayedReports.map((report) => {
               const sevUpper = (report.severity || '').toUpperCase();
+              const isSelected = selectedReportIds.includes(report.id);
               return (
                 <div 
                   key={report.id}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid var(--border-muted)',
+                    background: isSelected ? 'rgba(0, 176, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                    border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--border-muted)',
                     borderRadius: '16px',
                     padding: '18px 20px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px'
+                    gap: '10px',
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   {/* Report Card Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {/* Authority Checkbox */}
+                      {userRole === 'authority' && (
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectReport(report.id)}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
+                          title="Select report for deletion"
+                        />
+                      )}
                       <span className="user-email-badge" style={{ fontSize: '12px' }}>
                         👤 {report.email || 'Anonymous Citizen'}
                       </span>
@@ -2343,6 +2509,29 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
   // Track Firestore save state
   const [firestoreSaved, setFirestoreSaved] = useState(false);
 
+  // Month filter state for Dashboard User Management (Authority users default to current month YYYY-MM)
+  const getDashboardMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const value = `${year}-${month}`;
+      const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      options.push({ value, label });
+    }
+    options.push({ value: 'ALL', label: 'All Months' });
+    return options;
+  };
+
+  const getDashboardCurrentMonthKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const [dashboardSelectedMonth, setDashboardSelectedMonth] = useState(getDashboardCurrentMonthKey());
+
   // Real-time listener for user management & reports (Authority Role Only)
   useEffect(() => {
     if (userRole !== 'authority') return;
@@ -2387,7 +2576,23 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
 
     const combineUsersAndReports = () => {
       const combined = Array.from(usersMap.values()).map(u => {
-        const uReports = reportsData.filter(r => (r.email || '').toLowerCase() === u.email.toLowerCase());
+        const uAllReports = reportsData.filter(r => (r.email || '').toLowerCase() === u.email.toLowerCase());
+        
+        // Filter user reports by selected month if not 'ALL'
+        const uReports = dashboardSelectedMonth === 'ALL'
+          ? uAllReports
+          : uAllReports.filter(r => {
+              if (!r.timestamp) return false;
+              let d = new Date();
+              if (r.timestamp.toMillis) d = new Date(r.timestamp.toMillis());
+              else if (r.timestamp.seconds) d = new Date(r.timestamp.seconds * 1000);
+              else if (r.timestamp instanceof Date) d = r.timestamp;
+
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              return `${year}-${month}` === dashboardSelectedMonth;
+            });
+
         uReports.sort((a, b) => {
           const tA = a.timestamp?.seconds || 0;
           const tB = b.timestamp?.seconds || 0;
@@ -2409,7 +2614,7 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
       unsubUsers();
       unsubReports();
     };
-  }, [userRole]);
+  }, [userRole, dashboardSelectedMonth]);
 
   // OpenWeatherMap Live Weather states
   const [liveWeather, setLiveWeather] = useState({
@@ -3013,24 +3218,54 @@ function DashboardView({ backendHealthy, userRole, t = translations.en }) {
       {activeTab === 'user-management' && userRole === 'authority' && (
         <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <section className="panel" style={{ padding: '24px' }}>
-            <div className="panel-header" style={{ marginBottom: '16px' }}>
+            <div className="panel-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <h2 className="panel-title">👥 Municipal User Management & Incident Audit</h2>
                 <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
                   Inspect registered user profiles and audit submitted incident reports in real-time.
                 </p>
               </div>
-              <span style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                background: 'rgba(0, 230, 118, 0.15)',
-                color: '#00e676',
-                border: '1px solid rgba(0, 230, 118, 0.3)'
-              }}>
-                Authority Portal
-              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Month Filter Dropdown for Dashboard User Management */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>📅 Month:</span>
+                  <select
+                    value={dashboardSelectedMonth}
+                    onChange={(e) => setDashboardSelectedMonth(e.target.value)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid #00e676',
+                      borderRadius: '8px',
+                      color: 'var(--text-bright)',
+                      padding: '6px 12px',
+                      fontSize: '12.5px',
+                      fontWeight: '600',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                    title="Filter user report counts by month"
+                  >
+                    {getDashboardMonthOptions().map(opt => (
+                      <option key={opt.value} value={opt.value} style={{ background: '#12161f', color: '#fff' }}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  background: 'rgba(0, 230, 118, 0.15)',
+                  color: '#00e676',
+                  border: '1px solid rgba(0, 230, 118, 0.3)'
+                }}>
+                  Authority Portal
+                </span>
+              </div>
             </div>
 
             {userMgmtLoading ? (
