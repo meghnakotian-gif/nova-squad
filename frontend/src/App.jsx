@@ -1477,16 +1477,28 @@ function LiveMapView({ t = translations.en }) {
     try {
       let resolvedStart = startCoords || userLoc;
       
-      // 1. Geocode Start Location with accept-language=en if not using GPS
+      // 1. Geocode Start Location with accept-language=en, countrycodes=in, and viewbox=74.7,13.0,75.0,12.7&bounded=1
       if (!startInput.startsWith('My Location') || !resolvedStart) {
-        const startRes = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json&accept-language=en`
-        );
-        const startData = await startRes.json();
+        const startUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json&accept-language=en&countrycodes=in&viewbox=74.7,13.0,75.0,12.7&bounded=1`;
+        console.log(`🌐 [Nominatim Start Geocode Request URL]:`, startUrl);
+        const startRes = await fetch(startUrl);
+        let startData = await startRes.json();
+        console.log("📦 [Nominatim Start Geocode Raw Response]:", startData);
+
+        // Fallback for start location if bounded viewbox yields 0 results
+        if (!startData || startData.length === 0) {
+          const startFallbackUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json&accept-language=en&countrycodes=in`;
+          console.log(`🌐 [Nominatim Start Fallback Request URL]:`, startFallbackUrl);
+          const startResFb = await fetch(startFallbackUrl);
+          startData = await startResFb.json();
+          console.log("📦 [Nominatim Start Fallback Raw Response]:", startData);
+        }
+
         if (startData && startData.length > 0) {
           resolvedStart = [parseFloat(startData[0].lat), parseFloat(startData[0].lon)];
           setStartCoords(resolvedStart);
         } else {
+          console.log(`❌ [Validation Check Failed - Rejected]: Start location geocoding returned 0 results for query "${startInput}".`);
           setRouteError("Location not found — please enter a valid address");
           setDestinationCoords(null);
           setRouteInfo(null);
@@ -1496,35 +1508,34 @@ function LiveMapView({ t = translations.en }) {
         }
       }
 
-      // 2. Geocode Destination Location with accept-language=en
-      const destUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en`;
-      console.log(`🌐 [Nominatim Destination Geocode Request URL]:`, destUrl);
+      // 2. Geocode Destination Location with accept-language=en, countrycodes=in, and viewbox=74.7,13.0,75.0,12.7&bounded=1
+      const destUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en&countrycodes=in&viewbox=74.7,13.0,75.0,12.7&bounded=1`;
+      console.log(`🌐 [FINAL DESTINATION REQUEST URL RIGHT BEFORE FETCH]: ${destUrl}`);
       const res = await fetch(destUrl);
       let data = await res.json();
 
       console.log("📦 [Nominatim Destination Geocode Raw Response]:", data);
 
-      // Fallback 1: If query returns 0 results and has no comma (e.g. single-word place like "Kulur"), retry with ", India"
-      if ((!data || data.length === 0) && !destInput.includes(',')) {
-        const fallbackUrl1 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput + ', India')}&format=json&accept-language=en`;
-        console.log(`🌐 [Nominatim Fallback 1 Request URL]:`, fallbackUrl1);
+      // Fallback 1: If strict bounded viewbox returns 0 results, retry without bounded=1 (viewbox bias + countrycodes=in)
+      if ((!data || data.length === 0)) {
+        const fallbackUrl1 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en&countrycodes=in&viewbox=74.7,13.0,75.0,12.7`;
+        console.log(`🌐 [FINAL FALLBACK 1 REQUEST URL RIGHT BEFORE FETCH]: ${fallbackUrl1}`);
         const fallbackRes1 = await fetch(fallbackUrl1);
         data = await fallbackRes1.json();
         console.log("📦 [Nominatim Fallback 1 Raw Response]:", data);
       }
 
-      // Fallback 2: Retry with viewbox bias around starting coordinates if still empty
-      if ((!data || data.length === 0) && resolvedStart) {
-        const [sLat, sLng] = resolvedStart;
-        const fallbackUrl2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput)}&format=json&accept-language=en&viewbox=${sLng-0.5},${sLat+0.5},${sLng+0.5},${sLat-0.5}`;
-        console.log(`🌐 [Nominatim Fallback 2 Request URL (Viewbox)]`, fallbackUrl2);
+      // Fallback 2: If query still returns 0 results and has no comma, retry with ", India"
+      if ((!data || data.length === 0) && !destInput.includes(',')) {
+        const fallbackUrl2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destInput + ', India')}&format=json&accept-language=en&countrycodes=in`;
+        console.log(`🌐 [FINAL FALLBACK 2 REQUEST URL RIGHT BEFORE FETCH]: ${fallbackUrl2}`);
         const fallbackRes2 = await fetch(fallbackUrl2);
         data = await fallbackRes2.json();
         console.log("📦 [Nominatim Fallback 2 Raw Response]:", data);
       }
 
       if (!data || data.length === 0) {
-        console.warn(`⚠️ [Geocoding Failed] Nominatim returned 0 results for query: "${destInput}".`);
+        console.log(`❌ [Validation Check Failed - Rejected]: Nominatim returned 0 results for query "${destInput}" after primary and fallback searches. Rejection cause: Empty results array.`);
         setRouteError("Location not found — please enter a valid address");
         setDestinationCoords(null);
         setRouteInfo(null);
@@ -1537,6 +1548,7 @@ function LiveMapView({ t = translations.en }) {
       const destLng = parseFloat(data[0].lon);
 
       if (isNaN(destLat) || isNaN(destLng)) {
+        console.log(`❌ [Validation Check Failed - Rejected]: Geocoded destination coordinates for "${destInput}" parsed as NaN. Rejection cause: Invalid NaN coordinates.`, { rawLat: data[0]?.lat, rawLon: data[0]?.lon });
         setRouteError("Location not found — please enter a valid address");
         setDestinationCoords(null);
         setRouteInfo(null);
@@ -1551,7 +1563,7 @@ function LiveMapView({ t = translations.en }) {
         const distKm = calculateDistanceKm(baseLoc[0], baseLoc[1], destLat, destLng);
         console.log(`📏 [Distance Check] Geocoded location "${data[0].display_name}" (${destLat}, ${destLng}) is ${distKm.toFixed(2)} km away from start.`);
         if (distKm > 100) {
-          console.warn(`Geocoded destination is ${distKm.toFixed(1)}km away (exceeds 100km limit).`);
+          console.log(`❌ [Validation Check Failed - Rejected]: Geocoded destination is ${distKm.toFixed(1)}km away from start. Rejection cause: Exceeds 100km distance limit.`);
           setRouteError("Location not found — please enter a valid address within 100km");
           setDestinationCoords(null);
           setRouteInfo(null);
@@ -1565,7 +1577,7 @@ function LiveMapView({ t = translations.en }) {
       setRouteError('');
       setDestinationCoords([destLat, destLng]);
     } catch (err) {
-      console.error("Route geocoding error: ", err);
+      console.log(`❌ [Validation Check Failed - Rejected]: Geocoding request threw an exception for "${destInput}". Rejection cause: Network/Fetch Exception.`, err);
       setRouteError("Location not found — please enter a valid address");
       setDestinationCoords(null);
       setRouteInfo(null);
