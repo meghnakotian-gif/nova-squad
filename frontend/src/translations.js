@@ -44,6 +44,7 @@ export const translations = {
     card3Desc: "Enables regional emergency contacts and local citizens to report flood sightings to calibrate automated risk maps.",
 
     // Live Map View
+    liveRiskOverview: "Live Risk Overview",
     safeRouteFinder: "🧭 Safe Route Finder",
     startLocation: "Start Location",
     destinationAddress: "Destination Address",
@@ -166,6 +167,7 @@ export const translations = {
     card3Desc: "ಸ್ಥಳೀಯ ನಾಗರಿಕರು ಮತ್ತು ಪ್ರತಿಕ್ರಿಯಾ ತಂಡಗಳು ಪ್ರವಾಹ ಘಟನೆಗಳನ್ನು ದಾಖಲಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ.",
 
     // Live Map View
+    liveRiskOverview: "ಲೈವ್ ಅಪಾಯದ ಮುನ್ನೋಟ",
     safeRouteFinder: "🧭 ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಶೋಧಕ",
     startLocation: "ಪ್ರಾರಂಭದ ಸ್ಥಳ",
     destinationAddress: "ಗಮ್ಯಸ್ಥಾನ ವಿಳಾಸ",
@@ -288,6 +290,7 @@ export const translations = {
     card3Desc: "नागरिकों और उत्तरदाताओं को बाढ की स्थिति रिपोर्ट करने की सुविधा।",
 
     // Live Map View
+    liveRiskOverview: "लाइव जोखिम अवलोकन",
     safeRouteFinder: "🧭 सुरक्षित मार्ग खोजकर्ता",
     startLocation: "शुरुआती स्थान",
     destinationAddress: "गंतव्य पता",
@@ -410,6 +413,7 @@ export const translations = {
     card3Desc: "ಸ್ಥಳೀಯ ಜನಕುಲು ಮರಿಯಲೊದ ಮಾಹಿತಿನ್ ಕಡಪುಡರೆ ಸಾಯೊ ಮನ್ಪುಂಡು.",
 
     // Live Map View
+    liveRiskOverview: "ಲೈವ್ ಅಪಾಯದ ಲೆಕ್ಕ",
     safeRouteFinder: "🧭 ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಶೋಧಕ",
     startLocation: "ಸುರುತ ಜಾಗ",
     destinationAddress: "ಪೋಪಿನ ಜಾಗ",
@@ -532,6 +536,7 @@ export const translations = {
     card3Desc: "പ്രാദേശിക ജനങ്ങൾക്ക് വെള്ളപ്പൊക്ക വിവരങ്ങൾ തത്സമയം അറിയിക്കാൻ സഹായിക്കുന്നു.",
 
     // Live Map View
+    liveRiskOverview: "ലൈവ് റിസ്ക് അവലോകനം",
     safeRouteFinder: "🧭 സുരക്ഷിത പാത കണ്ടെത്തുക",
     startLocation: "തുടക്ക സ്ഥലം",
     destinationAddress: "ലക്ഷ്യസ്ഥാന വിലാസം",

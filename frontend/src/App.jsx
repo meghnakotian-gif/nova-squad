@@ -1401,6 +1401,14 @@ function LiveMapView({ t = translations.en }) {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [isFullscreen]);
 
   const fetchUserLocation = () => {
     setIsLocating(true);
@@ -1716,15 +1724,37 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0085, seed =
   };
 
   return (
-    <div className="map-view-grid">
+    <div className={`map-view-grid ${isFullscreen ? 'fullscreen-map-mode' : ''}`}>
       {/* Map Interactive Canvas */}
       <section className="panel map-card" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div className="map-view-header">
-          <h2 className="panel-title" style={{ margin: 0 }}>🗺️ Live Leaflet Risk Map</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            {loading ? 'Connecting Firestore...' : '🟢 Connected Live'}
-          </span>
+        <div className="map-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 className="panel-title" style={{ margin: 0 }}>🗺️ {t.liveRiskOverview || 'Live Risk Overview'}</h2>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(255, 255, 255, 0.05)', padding: '3px 8px', borderRadius: '12px', border: '1px solid var(--border-muted)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: loading ? 'var(--color-warning)' : 'var(--color-success)', display: 'inline-block' }}></span>
+              {loading ? (t.statusConnecting || 'Connecting...') : (t.statusConnected || 'Connected Live')}
+            </span>
+          </div>
+
+          <button 
+            className="fullscreen-toggle-btn"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Map'}
+            aria-label="Fullscreen Map"
+          >
+            {isFullscreen ? '✕ Exit Fullscreen' : '⛶ Fullscreen'}
+          </button>
         </div>
+
+        {isFullscreen && (
+          <button 
+            onClick={() => setIsFullscreen(false)}
+            className="floating-exit-fullscreen-btn"
+            title="Exit Fullscreen"
+          >
+            ✕ Exit Fullscreen
+          </button>
+        )}
 
         <div className="map-canvas" style={{ flexGrow: 1, minHeight: '380px', position: 'relative', overflow: 'hidden' }}>
           {/* Leaflet React Map Container */}
