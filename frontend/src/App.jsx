@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Link } from 'react-router-dom';
 import './App.css';
 
+// Import Firestore reference and functions
+import { db } from './firebase';
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+
 // Base URL for the Flask backend API
 const BACKEND_URL = 'http://localhost:5000';
 
@@ -171,7 +175,7 @@ function ReportFloodView() {
       </div>
 
       {submitted ? (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+        <div style={{ textalign: 'center', padding: '32px 0' }}>
           <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>✅</span>
           <h3 style={{ color: 'var(--text-bright)' }}>Report Logged</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
@@ -243,41 +247,97 @@ function ReportFloodView() {
 }
 
 // ==========================================
-// LIVE MAP VIEW (Vector Hazard Overlays)
+// LIVE MAP VIEW (Vector Hazard Overlays & Firestore)
 // ==========================================
 
 function LiveMapView() {
-  const [selectedZone, setSelectedZone] = useState({
-    name: 'Basin Gauge Sector Alpha',
-    level: '5.1 meters',
-    status: 'NORMAL',
-    risk: 'LOW RISK',
-    desc: 'No overtopping detected. Standard river discharge levels.'
-  });
+  // State variables for firestore indicators
+  const [zones, setZones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedZone, setSelectedZone] = useState(null);
 
-  const zones = [
-    {
-      name: 'Amazon Basin Gauge Sector Alpha',
-      level: '5.1m',
-      status: 'NORMAL',
-      risk: 'LOW RISK',
-      desc: 'No overtopping detected. Standard river discharge levels.'
-    },
-    {
-      name: 'North Delta Confluence Zone',
-      level: '7.8m',
-      status: 'CRITICAL',
-      risk: 'CRITICAL EVACUATION',
-      desc: 'Water levels exceeding critical flood limits. Evacuating agricultural fields.'
-    },
-    {
-      name: 'East Tributary Outflow',
-      level: '6.4m',
-      status: 'WARNING',
-      risk: 'ELEVATED MONITORING',
-      desc: 'Active runoff and elevated water level. Watching river pulse velocity closely.'
-    }
-  ];
+  useEffect(() => {
+    // Reference the 'flood_events' collection in Firestore
+    const colRef = collection(db, 'flood_events');
+
+    // Establish real-time onSnapshot listener for instant updates
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      // If collection is empty, auto-seed the default markers
+      if (snapshot.empty) {
+        console.log("No documents found in flood_events. Auto-seeding default markers to Firestore...");
+        
+        const seedData = [
+          {
+            id: 'sector_alpha',
+            name: 'Amazon Basin Gauge Sector Alpha',
+            level: '5.1m',
+            status: 'NORMAL',
+            risk: 'LOW RISK',
+            desc: 'No overtopping detected. Standard river discharge levels.',
+            x_coord: 25,
+            y_coord: 25,
+            marker_class: 'healthy-marker'
+          },
+          {
+            id: 'north_delta',
+            name: 'North Delta Confluence Zone',
+            level: '7.8m',
+            status: 'CRITICAL',
+            risk: 'CRITICAL EVACUATION',
+            desc: 'Water levels exceeding critical flood limits. Evacuating agricultural fields.',
+            x_coord: 55,
+            y_coord: 45,
+            marker_class: 'critical-marker'
+          },
+          {
+            id: 'east_tributary',
+            name: 'East Tributary Outflow',
+            level: '6.4m',
+            status: 'WARNING',
+            risk: 'ELEVATED MONITORING',
+            desc: 'Active runoff and elevated water level. Watching river pulse velocity closely.',
+            x_coord: 75,
+            y_coord: 25,
+            marker_class: 'warning-marker'
+          }
+        ];
+
+        seedData.forEach(async (zone) => {
+          const docRef = doc(db, 'flood_events', zone.id);
+          try {
+            await setDoc(docRef, zone);
+          } catch (err) {
+            console.error("Auto-seeding error writing doc: ", err);
+          }
+        });
+        return; // setDoc operations will trigger onSnapshot again with seedData
+      }
+
+      const zonesData = [];
+      snapshot.forEach((doc) => {
+        zonesData.push({ id: doc.id, ...doc.data() });
+      });
+
+      setZones(zonesData);
+
+      // Select default or keep updated selected marker details active
+      if (zonesData.length > 0) {
+        setSelectedZone((prev) => {
+          if (!prev || !zonesData.some((z) => z.id === prev.id)) {
+            return zonesData[0];
+          }
+          return zonesData.find((z) => z.id === prev.id);
+        });
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore live stream onSnapshot listener failed: ", error);
+      setLoading(false);
+    });
+
+    // Cleanup real-time stream subscription on component unmount
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div className="map-view-grid">
@@ -285,7 +345,9 @@ function LiveMapView() {
       <section className="panel map-card">
         <div className="map-view-header">
           <h2 className="panel-title" style={{ margin: 0 }}>🗺️ Live Risk Map</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Updated: Real-Time</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            {loading ? 'Connecting Firestore...' : '🟢 Connected Live'}
+          </span>
         </div>
 
         <div className="map-canvas">
@@ -303,30 +365,17 @@ function LiveMapView() {
             <path d="M 220 220 Q 300 120, 420 80" className="map-river-line" style={{ strokeWidth: '3px' }} />
           </svg>
 
-          {/* Hotspot Markers */}
-          <div 
-            className="map-marker healthy-marker" 
-            style={{ left: '25%', top: '25%' }}
-            onClick={() => setSelectedZone(zones[0])}
-          >
-            <div className="marker-inner"></div>
-          </div>
-
-          <div 
-            className="map-marker critical-marker" 
-            style={{ left: '55%', top: '45%' }}
-            onClick={() => setSelectedZone(zones[1])}
-          >
-            <div className="marker-inner"></div>
-          </div>
-
-          <div 
-            className="map-marker warning-marker" 
-            style={{ left: '75%', top: '25%' }}
-            onClick={() => setSelectedZone(zones[2])}
-          >
-            <div className="marker-inner"></div>
-          </div>
+          {/* Hotspot Markers streamed from Firestore */}
+          {zones.map((zone) => (
+            <div 
+              key={zone.id}
+              className={`map-marker ${zone.marker_class || 'healthy-marker'}`} 
+              style={{ left: `${zone.x_coord}%`, top: `${zone.y_coord}%` }}
+              onClick={() => setSelectedZone(zone)}
+            >
+              <div className="marker-inner"></div>
+            </div>
+          ))}
 
           {/* Canvas Legend overlay */}
           <div className="map-canvas-legend">
@@ -342,23 +391,29 @@ function LiveMapView() {
         <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <h3 className="panel-title" style={{ marginBottom: '16px' }}>📍 Zone Information</h3>
           
-          <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h4 style={{ margin: '0 0 4px', color: 'var(--text-bright)' }}>{selectedZone.name}</h4>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 16px' }}>
-              Current Level: <strong style={{ color: 'var(--text-bright)' }}>{selectedZone.level}</strong>
-            </p>
-            <p style={{ fontSize: '13.5px', color: 'var(--text-main)', lineHeight: '1.5', margin: '0 0 16px' }}>
-              {selectedZone.desc}
-            </p>
-            <div>
-              <span className={`alert-indicator ${selectedZone.status}`}>
-                {selectedZone.risk}
-              </span>
+          {selectedZone ? (
+            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h4 style={{ margin: '0 0 4px', color: 'var(--text-bright)' }}>{selectedZone.name}</h4>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 16px' }}>
+                Current Level: <strong style={{ color: 'var(--text-bright)' }}>{selectedZone.level}</strong>
+              </p>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-main)', lineHeight: '1.5', margin: '0 0 16px' }}>
+                {selectedZone.desc}
+              </p>
+              <div>
+                <span className={`alert-indicator ${selectedZone.status || 'NORMAL'}`}>
+                  {selectedZone.risk || 'LOW RISK'}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '13.5px' }}>
+              {loading ? 'Connecting to database...' : 'No telemetry points available.'}
+            </div>
+          )}
 
           <div style={{ borderTop: '1px solid var(--border-muted)', paddingTop: '16px', marginTop: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
-            Click markers on the map to switch telemetry zones.
+            Map hotspots synced to Cloud Firestore in real-time.
           </div>
         </div>
       </section>
