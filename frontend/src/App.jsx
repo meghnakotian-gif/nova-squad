@@ -157,31 +157,33 @@ function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, noti
               <option value="kok">🌐 ಕೊಂಕಣಿ</option>
             </select>
 
-            {/* Disaster Helpline Button */}
-            <a 
-              href="tel:1077"
-              className="sos-navbar-btn"
-              title="Call Disaster Management Helpline (1077)"
-              aria-label="Call Disaster Management Helpline (1077)"
-              style={{
-                background: 'linear-gradient(135deg, #ff3e3e, #ff5722)',
-                color: '#ffffff',
-                padding: '5px 12px',
-                borderRadius: '20px',
-                fontWeight: '800',
-                fontSize: '12px',
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: '0 0 14px rgba(255, 62, 62, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                letterSpacing: '0.3px',
-                cursor: 'pointer'
-              }}
-            >
-              📞 {t.sosButton || 'Helpline 1077'}
-            </a>
+            {/* Disaster Helpline Button (Citizen Role Only) */}
+            {userRole !== 'authority' && (
+              <a 
+                href="tel:1077"
+                className="sos-navbar-btn"
+                title="Call Disaster Management Helpline (1077)"
+                aria-label="Call Disaster Management Helpline (1077)"
+                style={{
+                  background: 'linear-gradient(135deg, #ff3e3e, #ff5722)',
+                  color: '#ffffff',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontWeight: '800',
+                  fontSize: '12px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 0 14px rgba(255, 62, 62, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  letterSpacing: '0.3px',
+                  cursor: 'pointer'
+                }}
+              >
+                📞 {t.sosButton || 'Helpline 1077'}
+              </a>
+            )}
 
             {/* Notification Bell Icon & Dropdown */}
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -734,7 +736,7 @@ function App() {
           <Route path="/" element={<HomeView t={t} />} />
           <Route path="/live-map" element={
             <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
-              <LiveMapView t={t} />
+              <LiveMapView t={t} userRole={userRole} />
             </ProtectedRoute>
           } />
           <Route path="/report" element={
@@ -779,12 +781,30 @@ function App() {
                   <span className="mobile-nav-icon">📊</span>
                   <span>{t.dashboard || 'Dashboard'}</span>
                 </NavLink>
+                <button 
+                  className="mobile-nav-item mobile-logout-btn" 
+                  onClick={async () => {
+                    try {
+                      await signOut(auth);
+                    } catch (e) { console.error(e); }
+                  }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
+                >
+                  <span className="mobile-nav-icon">🚪</span>
+                  <span>{t.logout || 'Logout'}</span>
+                </button>
               </>
             ) : (
-              <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">🔑</span>
-                <span>{t.login || 'Login'}</span>
-              </NavLink>
+              <>
+                <NavLink to="/login" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="mobile-nav-icon">🔑</span>
+                  <span>{t.login || 'Login'}</span>
+                </NavLink>
+                <NavLink to="/signup" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="mobile-nav-icon">👤</span>
+                  <span>{t.signup || 'Signup'}</span>
+                </NavLink>
+              </>
             )}
           </nav>
         )}
@@ -1831,7 +1851,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-function LiveMapView({ t = translations.en }) {
+function LiveMapView({ t = translations.en, userRole = 'citizen' }) {
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState(null);
@@ -2322,79 +2342,81 @@ function generateIrregularBlob(centerLat, centerLng, baseRadius = 0.0075, seed =
 
   return (
     <div className={`map-view-grid ${isFullscreen ? 'fullscreen-map-mode' : ''}`}>
-      {/* SOS / Emergency Responders Quick Call Banner */}
-      <div className="sos-emergency-banner" style={{
-        gridColumn: '1 / -1',
-        background: 'linear-gradient(135deg, rgba(255, 62, 62, 0.22), rgba(255, 87, 34, 0.22))',
-        border: '2px solid #ff3e3e',
-        borderRadius: '14px',
-        padding: '16px 20px',
-        marginBottom: '4px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '16px',
-        boxShadow: '0 0 24px rgba(255, 62, 62, 0.25)',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '32px', filter: 'drop-shadow(0 0 8px #ff3e3e)' }}>📞</span>
-          <div>
-            <div style={{ fontWeight: '800', fontSize: '15.5px', color: '#ff5252', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
-              {t.emergencyHeader || 'DISASTER HELPLINE'}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--text-bright)', marginTop: '2px', opacity: 0.9 }}>
-              {t.callEmergencyServices || 'Call Disaster Helpline (Toll-Free 1077 / 108)'}
+      {/* SOS / Emergency Responders Quick Call Banner (Citizen Role Only) */}
+      {userRole !== 'authority' && (
+        <div className="sos-emergency-banner" style={{
+          gridColumn: '1 / -1',
+          background: 'linear-gradient(135deg, rgba(255, 62, 62, 0.22), rgba(255, 87, 34, 0.22))',
+          border: '2px solid #ff3e3e',
+          borderRadius: '14px',
+          padding: '16px 20px',
+          marginBottom: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          boxShadow: '0 0 24px rgba(255, 62, 62, 0.25)',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <span style={{ fontSize: '32px', filter: 'drop-shadow(0 0 8px #ff3e3e)' }}>📞</span>
+            <div>
+              <div style={{ fontWeight: '800', fontSize: '15.5px', color: '#ff5252', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                {t.emergencyHeader || 'DISASTER HELPLINE'}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-bright)', marginTop: '2px', opacity: 0.9 }}>
+                {t.callEmergencyServices || 'Call Disaster Helpline (Toll-Free 1077 / 108)'}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <a
-            href="tel:1077"
-            style={{
-              background: 'linear-gradient(135deg, #ff3e3e, #d50000)',
-              color: '#ffffff',
-              padding: '10px 20px',
-              borderRadius: '24px',
-              fontWeight: '800',
-              fontSize: '13.5px',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 16px rgba(255, 62, 62, 0.45)',
-              border: '1px solid #ff5252',
-              transition: 'transform 0.2s ease'
-            }}
-            title="Call 1077 Disaster Management Helpline"
-          >
-            📞 {t.callDisasterHelpline || 'Call 1077 (Disaster)'}
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <a
+              href="tel:1077"
+              style={{
+                background: 'linear-gradient(135deg, #ff3e3e, #d50000)',
+                color: '#ffffff',
+                padding: '10px 20px',
+                borderRadius: '24px',
+                fontWeight: '800',
+                fontSize: '13.5px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 16px rgba(255, 62, 62, 0.45)',
+                border: '1px solid #ff5252',
+                transition: 'transform 0.2s ease'
+              }}
+              title="Call 1077 Disaster Management Helpline"
+            >
+              📞 {t.callDisasterHelpline || 'Call 1077 (Disaster)'}
+            </a>
 
-          <a
-            href="tel:108"
-            style={{
-              background: 'linear-gradient(135deg, #ff5722, #e65100)',
-              color: '#ffffff',
-              padding: '10px 20px',
-              borderRadius: '24px',
-              fontWeight: '800',
-              fontSize: '13.5px',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 16px rgba(255, 87, 34, 0.45)',
-              border: '1px solid #ff8a65',
-              transition: 'transform 0.2s ease'
-            }}
-            title="Call 108 Emergency Ambulance"
-          >
-            🚑 {t.callAmbulance || 'Call 108 (Ambulance)'}
-          </a>
+            <a
+              href="tel:108"
+              style={{
+                background: 'linear-gradient(135deg, #ff5722, #e65100)',
+                color: '#ffffff',
+                padding: '10px 20px',
+                borderRadius: '24px',
+                fontWeight: '800',
+                fontSize: '13.5px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 16px rgba(255, 87, 34, 0.45)',
+                border: '1px solid #ff8a65',
+                transition: 'transform 0.2s ease'
+              }}
+              title="Call 108 Emergency Ambulance"
+            >
+              🚑 {t.callAmbulance || 'Call 108 (Ambulance)'}
+            </a>
+          </div>
         </div>
-      </div>
+      )}
       {/* Map Interactive Canvas */}
       <section className="panel map-card" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="map-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
