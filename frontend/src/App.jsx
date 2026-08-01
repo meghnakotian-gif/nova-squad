@@ -1235,8 +1235,9 @@ function LiveMapView() {
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState(null);
 
-  // User location coordinate tracker (defaults to Bengaluru, India coordinates)
+  // User location coordinate tracker & Map Center tracker
   const [userLoc, setUserLoc] = useState([12.9716, 77.5946]);
+  const [mapCenter, setMapCenter] = useState([12.9716, 77.5946]);
   const [hasUserLoc, setHasUserLoc] = useState(false);
 
   const [destInput, setDestInput] = useState('');
@@ -1258,10 +1259,12 @@ function LiveMapView() {
         const ipRes = await fetch('https://ipapi.co/json/');
         const ipData = await ipRes.json();
         if (ipData.latitude && ipData.longitude) {
-          setUserLoc([ipData.latitude, ipData.longitude]);
+          const coords = [ipData.latitude, ipData.longitude];
+          setUserLoc(coords);
+          setMapCenter(coords);
           setHasUserLoc(true);
           setStartInput(`My Location (${ipData.city || 'IP'})`);
-          setStartCoords([ipData.latitude, ipData.longitude]);
+          setStartCoords(coords);
         } else {
           console.error("IP API returned invalid data:", ipData);
         }
@@ -1275,10 +1278,12 @@ function LiveMapView() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLoc([position.coords.latitude, position.coords.longitude]);
+          const coords = [position.coords.latitude, position.coords.longitude];
+          setUserLoc(coords);
+          setMapCenter(coords);
           setHasUserLoc(true);
           setStartInput('My Location (GPS)');
-          setStartCoords([position.coords.latitude, position.coords.longitude]);
+          setStartCoords(coords);
           setIsLocating(false);
         },
         (error) => {
@@ -1373,9 +1378,10 @@ function LiveMapView() {
         }
       }
 
-      // Valid destination! Clear errors and draw route
+      // Valid destination! Clear errors, draw route & update map center to destination
       setRouteError('');
       setDestinationCoords([destLat, destLng]);
+      setMapCenter([destLat, destLng]);
     } catch (err) {
       console.error("Route geocoding error: ", err);
       setRouteError("Location not found — please enter a valid address");
@@ -1393,167 +1399,96 @@ function LiveMapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Dynamically generate 5 sample points in a ~1.5km radius around mapCenter & fetch live rainfall from OpenWeatherMap
   useEffect(() => {
-    const colRef = collection(db, 'flood_events');
-
-    const unsubscribe = onSnapshot(colRef, (snapshot) => {
-      if (snapshot.empty) {
-        console.log("No documents found in flood_events. Auto-seeding Leaflet map hotspots to Firestore...");
-        
-        const seedData = [
-          {
-            id: 'sector_alpha',
-            name: 'Amazon Basin Gauge Sector Alpha',
-            level: '5.1m',
-            status: 'NORMAL',
-            risk: 'LOW RISK',
-            desc: 'No overtopping detected. Standard river discharge levels.',
-            lat: 12.9916,
-            lng: 77.5646,
-            latitude: 12.9916,
-            longitude: 77.5646,
-            marker_class: 'healthy-marker'
-          },
-          {
-            id: 'north_delta',
-            name: 'North Delta Confluence Zone',
-            level: '7.8m',
-            status: 'CRITICAL',
-            risk: 'CRITICAL EVACUATION',
-            desc: 'Water levels exceeding critical flood limits. Evacuating agricultural fields.',
-            lat: 12.9516,
-            lng: 77.6146,
-            latitude: 12.9516,
-            longitude: 77.6146,
-            marker_class: 'critical-marker'
-          },
-          {
-            id: 'east_tributary',
-            name: 'East Tributary Outflow',
-            level: '6.4m',
-            status: 'WARNING',
-            risk: 'ELEVATED MONITORING',
-            desc: 'Active runoff and elevated water level. Watching river pulse velocity closely.',
-            lat: 13.0016,
-            lng: 77.6046,
-            latitude: 13.0016,
-            longitude: 77.6046,
-            marker_class: 'warning-marker'
-          }
-        ];
-
-        seedData.forEach(async (zone) => {
-          const docRef = doc(db, 'flood_events', zone.id);
-          try {
-            await setDoc(docRef, zone);
-          } catch (err) {
-            console.error("Auto-seeding error writing doc: ", err);
-          }
-        });
-        return;
-      }
-
-      const zonesData = [];
-      snapshot.forEach((doc) => {
-        zonesData.push({ id: doc.id, ...doc.data() });
-      });
-
-      console.log("🔥 [Firestore Debug] Raw flood_events fetched from Firestore:", zonesData);
-
-      setZones(zonesData);
-
-      // Select default or keep updated selected marker details active
-      if (zonesData.length > 0) {
-        setSelectedZone((prev) => {
-          if (!prev || !zonesData.some((z) => z.id === prev.id)) {
-            return zonesData[0];
-          }
-          return zonesData.find((z) => z.id === prev.id);
-        });
-      }
-      setLoading(false);
-    }, (error) => {
-      console.error("Firestore live stream onSnapshot listener failed: ", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Fetch live OpenWeatherMap weather & rainfall for each zone and update Firestore risk status
-  useEffect(() => {
-    if (!zones || zones.length === 0) return;
+    if (!mapCenter || mapCenter.length < 2) return;
+    const [cLat, cLng] = mapCenter;
+    setLoading(true);
 
     const apiKey = "a770b95390e72d4ac82fab668028f53a";
 
-    zones.forEach(async (zone) => {
-      const rawLat = zone.lat ?? zone.latitude;
-      const rawLng = zone.lng ?? zone.longitude;
+    // 5 sample points distributed around mapCenter (~1.5km radius offsets)
+    const sampleConfigs = [
+      { id: `dyn_center_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'Central Confluence Zone', latOff: 0, lngOff: 0 },
+      { id: `dyn_north_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'North Sector Outflow', latOff: 0.009, lngOff: 0.003 },
+      { id: `dyn_southeast_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South-East Basin', latOff: -0.007, lngOff: 0.008 },
+      { id: `dyn_west_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'West Tributary Catchment', latOff: 0.002, lngOff: -0.010 },
+      { id: `dyn_southwest_${cLat.toFixed(3)}_${cLng.toFixed(3)}`, name: 'South-West Drainage Field', latOff: -0.008, lngOff: -0.005 }
+    ];
 
-      if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) {
-        console.warn(`⚠️ [Zone Weather Warning] Zone "${zone.name}" (${zone.id}) is missing lat/lng coordinates.`);
-        return;
-      }
-
-      const lat = parseFloat(rawLat);
-      const lng = parseFloat(rawLng);
-
-      if (isNaN(lat) || isNaN(lng)) return;
-
+    const fetchDynamicRiskZones = async () => {
       try {
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`;
-        const response = await fetch(url);
-        if (!response.ok) return;
+        const newZones = await Promise.all(sampleConfigs.map(async (cfg) => {
+          const lat = cLat + cfg.latOff;
+          const lng = cLng + cfg.lngOff;
+          
+          let rain1h = 0;
+          let desc = "Standard hydrological monitoring zone.";
+          let status = 'NORMAL';
+          let risk = 'LOW RISK';
 
-        const data = await response.json();
-        
-        // Extract 1-hour rainfall volume in mm/hour
-        const rain1h = data.rain?.['1h'] || (data.rain?.['3h'] ? data.rain['3h'] / 3 : 0);
+          try {
+            const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`;
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              rain1h = data.rain?.['1h'] || (data.rain?.['3h'] ? data.rain['3h'] / 3 : 0);
+              desc = `${data.weather?.[0]?.description || 'Live weather'}. Temp: ${data.main?.temp || 'N/A'}°C, Humidity: ${data.main?.humidity || 'N/A'}%.`;
 
-        // Console log live weather payload for debugging
-        console.log(`🌧️ [OpenWeatherMap Live Data] Zone "${zone.name}" (${lat}, ${lng}):`, {
-          rainfall_1h_mm: rain1h,
-          weather_main: data.weather?.[0]?.main,
-          description: data.weather?.[0]?.description,
-          temp_celsius: data.main?.temp,
-          humidity_pct: data.main?.humidity,
-          full_response: data
-        });
+              console.log(`🌧️ [Dynamic Weather Point] ${cfg.name} (${lat.toFixed(4)}, ${lng.toFixed(4)}):`, {
+                rainfall_1h_mm: rain1h,
+                weather_main: data.weather?.[0]?.main,
+                full_response: data
+              });
+            }
+          } catch (err) {
+            console.warn(`Weather fetch failed for ${cfg.name}:`, err);
+          }
 
-        // Risk classification rules based purely on current rainfall:
-        // > 20mm/hour => CRITICAL (red)
-        // > 10mm/hour => WARNING (yellow)
-        // otherwise => NORMAL (green)
-        let calculatedStatus = 'NORMAL';
-        let calculatedRisk = 'LOW RISK';
+          // Risk classification rules based purely on current rainfall:
+          // > 20mm/hour => CRITICAL (red)
+          // > 10mm/hour => WARNING (yellow)
+          // otherwise => NORMAL (green)
+          if (rain1h > 20) {
+            status = 'CRITICAL';
+            risk = 'CRITICAL EVACUATION';
+          } else if (rain1h > 10) {
+            status = 'WARNING';
+            risk = 'ELEVATED MONITORING';
+          } else {
+            status = 'NORMAL';
+            risk = 'LOW RISK';
+          }
 
-        if (rain1h > 20) {
-          calculatedStatus = 'CRITICAL';
-          calculatedRisk = 'CRITICAL EVACUATION';
-        } else if (rain1h > 10) {
-          calculatedStatus = 'WARNING';
-          calculatedRisk = 'ELEVATED MONITORING';
-        } else {
-          calculatedStatus = 'NORMAL';
-          calculatedRisk = 'LOW RISK';
-        }
-
-        // Only update Firestore if status/risk has changed to keep data synchronized
-        if (zone.status !== calculatedStatus || zone.risk !== calculatedRisk) {
-          const docRef = doc(db, 'flood_events', zone.id);
-          await updateDoc(docRef, {
-            status: calculatedStatus,
-            risk: calculatedRisk,
+          return {
+            id: cfg.id,
+            name: cfg.name,
+            lat: lat,
+            lng: lng,
+            latitude: lat,
+            longitude: lng,
+            status: status,
+            risk: risk,
+            level: `${(rain1h * 0.15 + 2.5).toFixed(1)}m`,
             rainfall_mm: rain1h,
-            last_weather_update: serverTimestamp()
-          });
-          console.log(`✅ [Firestore Sync] Updated zone "${zone.name}" risk to ${calculatedStatus} (${calculatedRisk}) based on ${rain1h}mm/h rainfall.`);
+            desc: desc,
+            radius: 1400
+          };
+        }));
+
+        setZones(newZones);
+        if (newZones.length > 0) {
+          setSelectedZone(newZones[0]);
         }
       } catch (err) {
-        console.error(`Error fetching OpenWeatherMap live data for zone ${zone.id}:`, err);
+        console.error("Error generating dynamic risk zones:", err);
+      } finally {
+        setLoading(false);
       }
-    });
-  }, [zones]);
+    };
+
+    fetchDynamicRiskZones();
+  }, [mapCenter]);
 
   // Helper method to create customized colored Leaflet div markers matching alert severity levels
   const getMarkerIcon = (risk) => {
@@ -1589,11 +1524,12 @@ function LiveMapView() {
 
         <div className="map-canvas" style={{ flexGrow: 1, minHeight: '380px', position: 'relative', overflow: 'hidden' }}>
           {/* Leaflet React Map Container */}
-          <MapContainer center={userLoc} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+          <MapContainer center={mapCenter} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
+            <ChangeMapView center={mapCenter} />
             
             {/* User current location indicator marker */}
             {hasUserLoc && (
