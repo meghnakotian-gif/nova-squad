@@ -16,6 +16,7 @@ import {
   doc, 
   setDoc, 
   addDoc, 
+  updateDoc,
   serverTimestamp, 
   query, 
   orderBy, 
@@ -1478,6 +1479,73 @@ function LiveMapView() {
 
     return () => unsubscribe();
   }, []);
+
+  // Fetch live OpenWeatherMap weather & rainfall for each zone and update Firestore risk status
+  useEffect(() => {
+    if (!zones || zones.length === 0) return;
+
+    const apiKey = "a770b95390e72d4ac82fab668028f53a";
+
+    zones.forEach(async (zone) => {
+      const lat = zone.lat ?? zone.latitude ?? zone.y_coord;
+      const lng = zone.lng ?? zone.longitude ?? zone.x_coord;
+
+      if (lat === undefined || lng === undefined || lat === null || lng === null) return;
+
+      try {
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`;
+        const response = await fetch(url);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        
+        // Extract 1-hour rainfall volume in mm/hour
+        const rain1h = data.rain?.['1h'] || (data.rain?.['3h'] ? data.rain['3h'] / 3 : 0);
+
+        // Console log live weather payload for debugging
+        console.log(`🌧️ [OpenWeatherMap Live Data] Zone "${zone.name}" (${lat}, ${lng}):`, {
+          rainfall_1h_mm: rain1h,
+          weather_main: data.weather?.[0]?.main,
+          description: data.weather?.[0]?.description,
+          temp_celsius: data.main?.temp,
+          humidity_pct: data.main?.humidity,
+          full_response: data
+        });
+
+        // Risk classification rules based purely on current rainfall:
+        // > 20mm/hour => CRITICAL (red)
+        // > 10mm/hour => WARNING (yellow)
+        // otherwise => NORMAL (green)
+        let calculatedStatus = 'NORMAL';
+        let calculatedRisk = 'LOW RISK';
+
+        if (rain1h > 20) {
+          calculatedStatus = 'CRITICAL';
+          calculatedRisk = 'CRITICAL EVACUATION';
+        } else if (rain1h > 10) {
+          calculatedStatus = 'WARNING';
+          calculatedRisk = 'ELEVATED MONITORING';
+        } else {
+          calculatedStatus = 'NORMAL';
+          calculatedRisk = 'LOW RISK';
+        }
+
+        // Only update Firestore if status/risk has changed to keep data synchronized
+        if (zone.status !== calculatedStatus || zone.risk !== calculatedRisk) {
+          const docRef = doc(db, 'flood_events', zone.id);
+          await updateDoc(docRef, {
+            status: calculatedStatus,
+            risk: calculatedRisk,
+            rainfall_mm: rain1h,
+            last_weather_update: serverTimestamp()
+          });
+          console.log(`✅ [Firestore Sync] Updated zone "${zone.name}" risk to ${calculatedStatus} (${calculatedRisk}) based on ${rain1h}mm/h rainfall.`);
+        }
+      } catch (err) {
+        console.error(`Error fetching OpenWeatherMap live data for zone ${zone.id}:`, err);
+      }
+    });
+  }, [zones]);
 
   // Helper method to create customized colored Leaflet div markers matching alert severity levels
   const getMarkerIcon = (risk) => {
