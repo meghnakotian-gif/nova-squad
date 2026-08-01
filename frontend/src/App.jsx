@@ -32,6 +32,19 @@ import {
 // Base URL for the Flask backend API
 const BACKEND_URL = 'https://nova-squad-backend.onrender.com';
 
+// Hardcoded municipal authority email accounts for Role-Based Access Control (RBAC)
+const AUTHORITY_EMAILS = [
+  'govmuncipalty@gmail.com',
+  'govmangluru@gmail.com',
+  'govbanglore@gmail.com'
+];
+
+export const getRoleForEmail = (email) => {
+  if (!email) return 'citizen';
+  const cleanEmail = email.trim().toLowerCase();
+  return AUTHORITY_EMAILS.some(a => a.toLowerCase() === cleanEmail) ? 'authority' : 'citizen';
+};
+
 // Import translation dictionary for multi-language support (English, Kannada, Hindi, Tulu, Malayalam)
 import { translations } from './translations';
 
@@ -61,7 +74,7 @@ function getTimeAgo(timestamp, timeRaw) {
 // ROOT COMPONENT WITH ROUTER
 // ==========================================
 
-function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead, lang, setLang, t }) {
+function HeaderNavbar({ backendHealthy, currentUser, userRole, authLoading, notifications = [], readIds = new Set(), onMarkRead, onMarkAllRead, lang, setLang, t }) {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
@@ -241,11 +254,13 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
                       {t.reportFlood || 'Report Incident'}
                     </NavLink>
                   </li>
-                  <li className="nav-item">
-                    <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                      {t.dashboard || 'Dashboard'}
-                    </NavLink>
-                  </li>
+                  {userRole === 'authority' && (
+                    <li className="nav-item">
+                      <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        {t.dashboard || 'Dashboard'}
+                      </NavLink>
+                    </li>
+                  )}
 
                   {/* Bell Icon with Unread Count Badge & Dropdown */}
                   <li className="nav-item" style={{ position: 'relative' }} ref={dropdownRef}>
@@ -315,10 +330,28 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
                     )}
                   </li>
 
-                  <li className="nav-item" style={{ display: 'flex', alignItems: 'center' }}>
-                    <span className="user-email-badge" style={{ margin: '0 8px' }}>
+                  <li className="nav-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="user-email-badge" style={{ margin: '0 4px' }}>
                       👤 {currentUser.email}
                     </span>
+                    {userRole === 'authority' && (
+                      <span className="authority-badge" title="Municipal Authority Access Granted" style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: 'linear-gradient(135deg, rgba(0, 176, 255, 0.25), rgba(0, 230, 118, 0.25))',
+                        color: '#00e676',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(0, 230, 118, 0.4)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        letterSpacing: '0.3px',
+                        boxShadow: '0 0 10px rgba(0, 230, 118, 0.2)'
+                      }}>
+                        🏛️ {t.municipalAuthority || 'Municipal Authority'}
+                      </span>
+                    )}
                   </li>
                   <li className="nav-item">
                     <button 
@@ -361,14 +394,17 @@ function HeaderNavbar({ backendHealthy, currentUser, authLoading, notifications 
 }
 
 // ==========================================
-// PROTECTED ROUTE COMPONENT
+// PROTECTED ROUTE COMPONENT (Handles Role-Based Access Control)
 // ==========================================
-function ProtectedRoute({ currentUser, authLoading, children }) {
+function ProtectedRoute({ currentUser, authLoading, userRole, requiredRole, children }) {
   if (authLoading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>Loading session...</div>;
   }
   if (!currentUser) {
     return <Navigate to="/login" replace />;
+  }
+  if (requiredRole && userRole !== requiredRole) {
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -379,6 +415,7 @@ function App() {
 
   // Authentication session tracking states
   const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState('citizen');
   const [authLoading, setAuthLoading] = useState(true);
 
   // Multi-language localization state (persisted in localStorage, defaults to English)
@@ -410,9 +447,25 @@ function App() {
     checkBackendHealth();
     const interval = setInterval(checkBackendHealth, 15000);
     
-    // Subscribe to Firebase Authentication session transitions
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    // Subscribe to Firebase Authentication session transitions & sync user roles
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (user) {
+        const role = getRoleForEmail(user.email);
+        setUserRole(role);
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          await setDoc(userDocRef, {
+            email: user.email,
+            role: role,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (err) {
+          console.warn("Firestore user role sync warning:", err);
+        }
+      } else {
+        setUserRole('citizen');
+      }
       setAuthLoading(false);
     });
 
@@ -600,7 +653,8 @@ function App() {
     <Router>
       <HeaderNavbar 
         backendHealthy={backendHealthy} 
-        currentUser={currentUser} 
+        currentUser={currentUser}
+        userRole={userRole} 
         authLoading={authLoading}
         notifications={notifications}
         readIds={readNotificationIds}
@@ -633,17 +687,17 @@ function App() {
       <Routes>
         <Route path="/" element={<HomeView t={t} />} />
         <Route path="/live-map" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
             <LiveMapView t={t} />
           </ProtectedRoute>
         } />
         <Route path="/report" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole}>
             <ReportFloodView t={t} />
           </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
-          <ProtectedRoute currentUser={currentUser} authLoading={authLoading}>
+          <ProtectedRoute currentUser={currentUser} authLoading={authLoading} userRole={userRole} requiredRole="authority">
             <DashboardView backendHealthy={backendHealthy} t={t} />
           </ProtectedRoute>
         } />
@@ -675,10 +729,12 @@ function App() {
                 <span className="mobile-nav-icon">📝</span>
                 <span>{t.reportFlood || 'Report'}</span>
               </NavLink>
-              <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
-                <span className="mobile-nav-icon">📊</span>
-                <span>{t.dashboard || 'Dashboard'}</span>
-              </NavLink>
+              {userRole === 'authority' && (
+                <NavLink to="/dashboard" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="mobile-nav-icon">📊</span>
+                  <span>{t.dashboard || 'Dashboard'}</span>
+                </NavLink>
+              )}
               <Link to="/" onClick={() => signOut(auth)} className="mobile-nav-item">
                 <span className="mobile-nav-icon">🔓</span>
                 <span>{t.logout || 'Logout'}</span>
@@ -719,7 +775,20 @@ function LoginView({ t = translations.en }) {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      const role = getRoleForEmail(user.email);
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, {
+          email: user.email,
+          role: role,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (docErr) {
+        console.warn("Login Firestore user role write warning:", docErr);
+      }
+
       // Redirect successfully authenticated users to Home page
       navigate("/");
     } catch (err) {
@@ -825,13 +894,15 @@ function SignupView({ t = translations.en }) {
       // Create user credential in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      const role = getRoleForEmail(email);
 
-      // Save user reference record in Firestore's 'users' collection
+      // Save user reference record in Firestore's 'users' collection with role
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         email: email,
+        role: role,
         createdAt: serverTimestamp()
-      });
+      }, { merge: true });
 
       // Redirect successfully registered users to Home page
       navigate("/");
