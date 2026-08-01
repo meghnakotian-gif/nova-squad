@@ -881,22 +881,61 @@ function LiveMapView() {
   const [routeCoords, setRouteCoords] = useState([]);
   const [routeInfo, setRouteInfo] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
-  // Automatically set GPS location when available
-  useEffect(() => {
-    if (hasUserLoc && !startInput) {
-       setStartInput('My Location (GPS)');
-       setStartCoords(userLoc);
+  const fetchUserLocation = () => {
+    setIsLocating(true);
+    
+    const fallbackToIP = async (errorMsg) => {
+      console.warn(`Geolocation failed (${errorMsg}). Falling back to IP-based location.`);
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/');
+        const ipData = await ipRes.json();
+        if (ipData.latitude && ipData.longitude) {
+          setUserLoc([ipData.latitude, ipData.longitude]);
+          setHasUserLoc(true);
+          setStartInput(`My Location (${ipData.city || 'IP'})`);
+          setStartCoords([ipData.latitude, ipData.longitude]);
+        } else {
+          console.error("IP API returned invalid data:", ipData);
+        }
+      } catch (err) {
+        console.error("IP-based fallback also failed:", err);
+      } finally {
+        setIsLocating(false);
+      }
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLoc([position.coords.latitude, position.coords.longitude]);
+          setHasUserLoc(true);
+          setStartInput('My Location (GPS)');
+          setStartCoords([position.coords.latitude, position.coords.longitude]);
+          setIsLocating(false);
+        },
+        (error) => {
+          let msg = "";
+          switch(error.code) {
+            case error.PERMISSION_DENIED: msg = "User denied the request for Geolocation."; break;
+            case error.POSITION_UNAVAILABLE: msg = "Location information is unavailable."; break;
+            case error.TIMEOUT: msg = "The request to get user location timed out."; break;
+            default: msg = "An unknown error occurred."; break;
+          }
+          console.error("Geolocation Error:", msg, error);
+          fallbackToIP(msg);
+        },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+      );
+    } else {
+      console.error("Geolocation Error: Geolocation is not supported by this browser.");
+      fallbackToIP("Not supported by browser");
     }
-  }, [hasUserLoc, userLoc]);
+  };
 
   const handleUseMyLocation = () => {
-    if (hasUserLoc) {
-       setStartInput('My Location (GPS)');
-       setStartCoords(userLoc);
-    } else {
-       alert("GPS location not yet available. Please ensure location permissions are granted.");
-    }
+    fetchUserLocation();
   };
 
   const handleRouteSearch = async () => {
@@ -904,7 +943,7 @@ function LiveMapView() {
     setRouteLoading(true);
     try {
       let resolvedStart = startCoords;
-      if (startInput !== 'My Location (GPS)') {
+      if (!startInput.startsWith('My Location')) {
         const startRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(startInput)}&format=json`);
         const startData = await startRes.json();
         if (startData && startData.length > 0) {
@@ -933,18 +972,8 @@ function LiveMapView() {
 
   // Request browser geolocation on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLoc([position.coords.latitude, position.coords.longitude]);
-          setHasUserLoc(true);
-        },
-        (error) => {
-          console.warn("User geolocation permission denied or failed. Displaying default coordinates.", error);
-        },
-        { timeout: 5000 }
-      );
-    }
+    fetchUserLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1170,7 +1199,9 @@ function LiveMapView() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Location</label>
-                <button onClick={handleUseMyLocation} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '11px', cursor: 'pointer' }}>Use GPS</button>
+                <button onClick={handleUseMyLocation} disabled={isLocating} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '11px', cursor: isLocating ? 'not-allowed' : 'pointer', opacity: isLocating ? 0.5 : 1 }}>
+                  {isLocating ? '⏳ Locating...' : 'Use GPS'}
+                </button>
               </div>
               <input 
                 type="text" 
