@@ -7,7 +7,7 @@ import { db } from './firebase';
 import { collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 
 // Base URL for the Flask backend API
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = 'https://nova-squad-backend.onrender.com';
 
 // ==========================================
 // ROOT COMPONENT WITH ROUTER
