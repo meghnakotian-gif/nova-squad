@@ -1680,13 +1680,27 @@ body.app-theme-light textarea::placeholder {
   color: #94a3b8 !important;
 }
 
-/* 4. Desktop Navigation Links & Mobile Bottom Navigation Bar in Light Theme */
+/* 4. Desktop Navigation Bar & Links in Light Theme */
+body.app-theme-light .navbar {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
 body.app-theme-light .nav-link {
   color: #334155 !important;
 }
-body.app-theme-light .nav-link.active,
+
 body.app-theme-light .nav-link:hover {
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+}
+
+body.app-theme-light .nav-link.active {
   color: #0284c7 !important;
+  background: rgba(2, 132, 199, 0.12) !important;
+  border: 1px solid rgba(2, 132, 199, 0.3) !important;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.15) !important;
 }
 
 body.app-theme-light .mobile-navbar {
@@ -1701,20 +1715,27 @@ body.app-theme-light .mobile-nav-item {
 
 body.app-theme-light .mobile-nav-item.active {
   color: #0284c7 !important;
-  background: rgba(2, 132, 199, 0.1) !important;
+  background: rgba(2, 132, 199, 0.12) !important;
   border-color: rgba(2, 132, 199, 0.3) !important;
 }
 
 /* 5. User Email Badge & Status Badges in Light Theme */
 body.app-theme-light .user-email-badge {
   background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+body.app-theme-light .authority-badge {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.12), rgba(16, 185, 129, 0.12)) !important;
+  color: #059669 !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
 }
 
 body.app-theme-light .status-badge {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #334155 !important;
 }
 
