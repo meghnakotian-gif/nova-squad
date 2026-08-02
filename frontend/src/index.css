@@ -1557,83 +1557,251 @@ body {
 }
 
 /* App-Wide Theme System Overrides */
+/* App-Wide Theme System Overrides: White / Light Theme */
 body.app-theme-light, .app-theme-light, .dashboard-theme-light {
   --bg-main: #f8fafc;
-  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-card: #ffffff;
   --bg-card-hover: #f1f5f9;
+  --border-glow: rgba(2, 132, 199, 0.2);
   --border-muted: #cbd5e1;
+  --color-primary: #0284c7;
+  --color-primary-glow: rgba(2, 132, 199, 0.15);
   --text-main: #334155;
   --text-muted: #64748b;
   --text-bright: #0f172a;
   background-color: #f8fafc !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(2, 132, 199, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%) !important;
   color: #0f172a !important;
 }
 
-body.app-theme-light .panel,
-body.app-theme-light .info-card,
-body.app-theme-light .auth-layout,
-body.app-theme-light .report-layout,
-body.app-theme-light .header-navbar,
-body.app-theme-light .dashboard-container,
-.app-theme-light .panel,
-.app-theme-light .info-card,
-.app-theme-light .auth-layout,
-.app-theme-light .report-layout,
-.app-theme-light .header-navbar,
-.app-theme-light .dashboard-container,
-.dashboard-theme-light .panel {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
-}
-
+/* 1. Global Headings & Text in Light Theme */
 body.app-theme-light h1,
 body.app-theme-light h2,
 body.app-theme-light h3,
 body.app-theme-light h4,
+body.app-theme-light h5,
+body.app-theme-light h6,
 body.app-theme-light .panel-title,
+body.app-theme-light .home-title,
 body.app-theme-light strong,
+body.app-theme-light b,
 .app-theme-light h1,
 .app-theme-light h2,
 .app-theme-light h3,
 .app-theme-light h4,
 .app-theme-light .panel-title,
-.app-theme-light strong,
-.dashboard-theme-light .panel-title,
-.dashboard-theme-light h2,
-.dashboard-theme-light h3,
-.dashboard-theme-light strong {
+.dashboard-theme-light .panel-title {
   color: #0f172a !important;
 }
 
-body.app-theme-light .telemetry-card,
-.app-theme-light .telemetry-card,
-.dashboard-theme-light .telemetry-card {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #0f172a !important;
+body.app-theme-light .brand-section h1 {
+  background: linear-gradient(135deg, #0f172a 30%, #0284c7 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
 }
 
-body.app-theme-light .card-value,
-.app-theme-light .card-value,
-.dashboard-theme-light .card-value {
+body.app-theme-light p,
+body.app-theme-light span:not(.brand-badge):not(.sos-navbar-btn):not(.notification-badge):not(.status-dot):not(.authority-badge):not(.emergency-banner-btn),
+body.app-theme-light label,
+body.app-theme-light li,
+body.app-theme-light td,
+body.app-theme-light th {
+  color: #334155;
+}
+
+body.app-theme-light .card-label,
+body.app-theme-light .text-muted,
+body.app-theme-light small {
+  color: #64748b !important;
+}
+
+body.app-theme-light .card-value {
   color: #0284c7 !important;
 }
 
-body.app-theme-light .theme-switcher-dropdown,
-.app-theme-light .theme-switcher-dropdown,
-.dashboard-theme-light .theme-switcher-dropdown {
+/* 2. Panels, Cards, Containers & Layouts in Light Theme */
+body.app-theme-light .panel,
+body.app-theme-light .card,
+body.app-theme-light .map-card,
+body.app-theme-light .info-card,
+body.app-theme-light .telemetry-card,
+body.app-theme-light .zone-detail-card,
+body.app-theme-light .prediction-output-card,
+body.app-theme-light .auth-layout,
+body.app-theme-light .report-layout,
+body.app-theme-light .dashboard-container,
+body.app-theme-light .home-hero,
+body.app-theme-light .sim-card,
+body.app-theme-light .user-card,
+body.app-theme-light .quick-stat-box,
+.app-theme-light .panel,
+.app-theme-light .info-card,
+.dashboard-theme-light .panel {
   background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.app-theme-light .app-header {
+  border-bottom-color: #cbd5e1 !important;
+}
+
+body.app-theme-light .app-footer {
+  border-top-color: #cbd5e1 !important;
+  color: #64748b !important;
+}
+
+/* 3. Inputs, Textareas, Selects & Dropdowns in Light Theme */
+body.app-theme-light input[type="text"],
+body.app-theme-light input[type="email"],
+body.app-theme-light input[type="password"],
+body.app-theme-light input[type="number"],
+body.app-theme-light select,
+body.app-theme-light textarea,
+body.app-theme-light .language-selector-dropdown,
+body.app-theme-light .theme-switcher-dropdown {
+  background-color: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
 }
 
-body.app-theme-light .theme-switcher-dropdown option,
-.app-theme-light .theme-switcher-dropdown option,
-.dashboard-theme-light .theme-switcher-dropdown option {
-  background: #ffffff;
-  color: #0f172a;
+body.app-theme-light select option,
+body.app-theme-light .language-selector-dropdown option,
+body.app-theme-light .theme-switcher-dropdown option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.app-theme-light input::placeholder,
+body.app-theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* 4. Desktop Navigation Links & Mobile Bottom Navigation Bar in Light Theme */
+body.app-theme-light .nav-link {
+  color: #334155 !important;
+}
+body.app-theme-light .nav-link.active,
+body.app-theme-light .nav-link:hover {
+  color: #0284c7 !important;
+}
+
+body.app-theme-light .mobile-navbar {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-top-color: #cbd5e1 !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.app-theme-light .mobile-nav-item {
+  color: #64748b !important;
+}
+
+body.app-theme-light .mobile-nav-item.active {
+  color: #0284c7 !important;
+  background: rgba(2, 132, 199, 0.1) !important;
+  border-color: rgba(2, 132, 199, 0.3) !important;
+}
+
+/* 5. User Email Badge & Status Badges in Light Theme */
+body.app-theme-light .user-email-badge {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+body.app-theme-light .status-badge {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+/* 6. Notification Bell & Dropdown Menu in Light Theme */
+body.app-theme-light .notification-bell-btn {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+body.app-theme-light .notification-dropdown {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
+}
+
+body.app-theme-light .notification-header {
+  background: #f8fafc !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+body.app-theme-light .notification-item {
+  border-bottom-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+
+body.app-theme-light .notification-item.unread {
+  background: #f0f9ff !important;
+}
+
+body.app-theme-light .notification-location,
+body.app-theme-light .notification-details {
+  color: #334155 !important;
+}
+
+/* 7. Tables in Dashboard / User Management in Light Theme */
+body.app-theme-light table {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.app-theme-light th {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-bottom-color: #cbd5e1 !important;
+}
+
+body.app-theme-light td {
+  color: #334155 !important;
+  border-bottom-color: #f1f5f9 !important;
+}
+
+body.app-theme-light tr:hover td {
+  background: #f8fafc !important;
+}
+
+/* 8. Dashboard Tabs & AI Predictor Inputs in Light Theme */
+body.app-theme-light .dashboard-tab {
+  color: #64748b !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+body.app-theme-light .dashboard-tab.active {
+  color: #ffffff !important;
+  background: #0284c7 !important;
+  border-color: #0284c7 !important;
+}
+
+body.app-theme-light .sim-input-group label {
+  color: #0f172a !important;
+}
+
+body.app-theme-light .sim-val-display {
+  color: #0284c7 !important;
+  background: #f0f9ff !important;
+  border-color: #bae6fd !important;
+}
+
+/* 9. Incident Report Cards & Detail Views in Light Theme */
+body.app-theme-light .report-card,
+body.app-theme-light .incident-item {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
 /* Ocean Blue App-Wide Theme Overrides */
